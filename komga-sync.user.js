@@ -4,7 +4,7 @@
 // @grant       GM.xmlHttpRequest
 // @grant       GM.getValue
 // @grant       GM.setValue
-// @match       http*://*komga*/*
+// @match       http*://komga.*/*
 // @match       http*://*/komga/*
 // @version     1.0
 // @author      lmaonator
