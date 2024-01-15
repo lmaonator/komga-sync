@@ -4,12 +4,16 @@
 // @grant       GM.xmlHttpRequest
 // @grant       GM.getValue
 // @grant       GM.setValue
+// @match       http*://*komga*/*
+// @match       http*://*/komga/*
 // @version     1.0
 // @author      lmaonator
 // @description Sync chapter progress with MangaUpdates
 // ==/UserScript==
 
 (async () => {
+    if (!document.title.startsWith("Komga")) return;
+
     const prefix = "[komga-sync] ";
 
     const API_MU = "https://api.mangaupdates.com/v1";
