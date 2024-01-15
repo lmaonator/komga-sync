@@ -4,11 +4,14 @@
 // @grant       GM.xmlHttpRequest
 // @grant       GM.getValue
 // @grant       GM.setValue
+// @grant       GM.deleteValue
+// @grant       GM.openInTab
 // @match       http*://komga.*/*
 // @match       http*://*/komga/*
+// @match       https://lmaonator.github.io/komga-sync/auth-*.html*
 // @version     1.0
 // @author      lmaonator
-// @description Sync chapter progress with MangaUpdates
+// @description Sync manga chapter progress with tracking websites.
 // @license     GPL-3.0-or-later
 // @homepageURL https://github.com/lmaonator/komga-sync
 // @supportURL  https://github.com/lmaonator/komga-sync/issues
@@ -33,13 +36,17 @@
 //
 
 (async () => {
-    if (!document.title.startsWith("Komga")) return;
-
     const prefix = "[komga-sync] ";
+    const MU_API = "https://api.mangaupdates.com/v1";
+    const MAL_OAUTH = "https://myanimelist.net/v1/oauth2";
+    const MAL_API = "https://api.myanimelist.net/v2";
+    const DICLAM = "ZjE4NDIxNGY4MTg4Y2RmNzEwZmM4N2MwMzMzYzhlMGM";
 
-    const API_MU = "https://api.mangaupdates.com/v1";
+    if (document.title === "komga-sync MAL auth") {
+        return malAuth();
+    }
 
-    const MALDI = "ZjE4NDIxNGY4MTg4Y2RmNzEwZmM4N2MwMzMzYzhlMGM";
+    if (!document.title.startsWith("Komga")) return;
 
     const chapter = {
         id: "",
@@ -121,19 +128,22 @@
             ) {
                 chapter.completed = true;
                 console.log(prefix + "Chapter complete, syncing..");
-                const muLink = chapter.links.find(
-                    (i) => i.label === "MangaUpdates",
-                );
-                if (muLink) {
-                    if (
-                        (await updateMuListSeries(
-                            muLink.url,
-                            chapter.number,
-                        ).catch(() => false)) === true
-                    ) {
-                        console.log(
-                            prefix + "Successfully synced with MangaUpdates",
+
+                const sites = [
+                    ["MangaUpdates", updateMuListSeries],
+                    ["MyAnimeList", updateMalListStatus],
+                ];
+                for (const [site, func] of sites) {
+                    const link = chapter.links.find((i) => i.label === site);
+                    if (link) {
+                        const r = await func(url, chapter.number).catch(
+                            () => false,
                         );
+                        if (r === true) {
+                            console.log(
+                                prefix + "Successfully synced with " + site,
+                            );
+                        }
                     }
                 }
             }
@@ -147,7 +157,7 @@
         const token = await GM.getValue("mu_session_token");
         return new Promise((resolve, reject) => {
             GM.xmlHttpRequest({
-                url: API_MU + endpoint,
+                url: MU_API + endpoint,
                 method,
                 headers: {
                     Authorization: "Bearer " + token,
@@ -161,11 +171,11 @@
                             "MangaUpdates session expired, please login again.",
                         );
                     }
-                    resolve(response);
+                    return resolve(response);
                 },
                 onerror: function (error) {
                     console.error(error);
-                    reject(error);
+                    return reject(error);
                 },
             });
         });
@@ -179,7 +189,7 @@
             return false;
         }
 
-        let r = await muRequest("/lists/series/" + urlToSeriesId(url), "GET");
+        let r = await muRequest("/lists/series/" + urlToId(url), "GET");
         const current = JSON.parse(r.responseText);
         if (current.status.chapter >= chapterNum) {
             return true;
@@ -188,13 +198,112 @@
         r = await muRequest("/lists/series/update", "POST", [
             {
                 series: {
-                    id: urlToSeriesId(url),
+                    id: urlToId(url),
                 },
                 status: {
                     chapter: chapterNum,
                 },
             },
         ]);
+        if (r.status === 200) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    async function malToken(code, code_verifier) {
+        const params = {
+            client_id: atob(DICLAM),
+            client_secret: "",
+        };
+        if (code !== undefined && code_verifier !== undefined) {
+            Object.assign(params, {
+                grant_type: "authorization_code",
+                code,
+                code_verifier,
+            });
+        } else {
+            Object.assign(params, {
+                grant_type: "refresh_token",
+                refresh_token: await GM.getValue("mal_refresh_token"),
+            });
+        }
+        const data = new URLSearchParams(params).toString();
+        return new Promise((resolve, reject) => {
+            GM.xmlHttpRequest({
+                url: MAL_OAUTH + "/token",
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/x-www-form-urlencoded",
+                },
+                data,
+                onload: (r) => {
+                    if (r.status === 200) {
+                        const data = JSON.parse(r.responseText);
+                        GM.setValue("mal_access_token", data.access_token);
+                        GM.setValue("mal_refresh_token", data.refresh_token);
+                        return resolve(true);
+                    }
+                    alert("MyAnimeList session expired, please login again.");
+                    console.error(r);
+                    return resolve(false);
+                },
+                onerror: (e) => {
+                    console.error(e);
+                    return reject(false);
+                },
+            });
+        });
+    }
+
+    async function malRequest(endpoint, method, params) {
+        const access_token = await GM.getValue("mal_access_token");
+        let data = params;
+        if (data !== undefined) {
+            data = new URLSearchParams(data).toString();
+        }
+        return new Promise((resolve, reject) => {
+            GM.xmlHttpRequest({
+                url: MAL_API + endpoint,
+                method,
+                headers: {
+                    Authorization: "Bearer " + access_token,
+                    "Content-Type": "application/x-www-form-urlencoded",
+                },
+                data,
+                onload: async (r) => {
+                    if (r.status === 401) {
+                        if (await malToken()) {
+                            return malRequest(endpoint, method, params);
+                        }
+                    }
+                    return resolve(r);
+                },
+                onerror: function (e) {
+                    console.error(e);
+                    return reject(e);
+                },
+            });
+        });
+    }
+
+    async function updateMalListStatus(url, chapterNum) {
+        const mangaId = urlToId(url);
+        chapterNum = Math.floor(chapterNum);
+
+        let r = await malRequest(
+            "/manga/" + mangaId + "?fields=my_list_status",
+            "GET",
+        );
+        let data = JSON.parse(r.responseText);
+        if (data.my_list_status.num_chapters_read >= chapterNum) {
+            return true;
+        }
+
+        r = await malRequest("/manga/" + mangaId + "/my_list_status", "PATCH", {
+            num_chapters_read: chapterNum,
+        });
         if (r.status === 200) {
             return true;
         } else {
@@ -228,13 +337,13 @@
         // MangaUpdates login
         const muLogin = document.createElement("button");
         muLogin.innerText = "MangaUpdates Login";
-        muLogin.style = "all: revert;";
+        muLogin.style = "all: revert; margin: 3px;";
         content.appendChild(muLogin);
         muLogin.addEventListener("click", async () => {
             const username = prompt("MangaUpdates username:");
             const password = prompt("MangaUpdates password:");
             GM.xmlHttpRequest({
-                url: API_MU + "/account/login",
+                url: MU_API + "/account/login",
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 data: JSON.stringify({
@@ -255,6 +364,32 @@
             });
         });
         if ((await GM.getValue("mu_session_token", "")) !== "") {
+            content.appendChild(document.createTextNode(" Logged in ✅"));
+        }
+        content.appendChild(document.createElement("br"));
+
+        // MyAnimeList login
+        const malLogin = document.createElement("button");
+        malLogin.innerText = "MyAnimeList Login";
+        malLogin.style = "all: revert; margin: 3px;";
+        content.appendChild(malLogin);
+        malLogin.addEventListener("click", async () => {
+            const state = randStr(16);
+            const challenge = randStr(64);
+            await GM.setValue("mal_state", state);
+            await GM.setValue("mal_challenge", challenge);
+            GM.openInTab(
+                MAL_OAUTH +
+                    "/authorize?response_type=code&client_id=" +
+                    atob(DICLAM) +
+                    "&state=" +
+                    state +
+                    "&code_challenge=" +
+                    challenge +
+                    "&code_challenge_method=plain",
+            );
+        });
+        if ((await GM.getValue("mal_access_token", "")) !== "") {
             content.appendChild(document.createTextNode(" Logged in ✅"));
         }
 
@@ -314,41 +449,34 @@
             urlInput.size = "80";
             urlInput.style = "all: revert;";
             root.appendChild(urlInput);
-            const searchLabel = document.createElement("label");
-            searchLabel.textContent = "Search Term:";
-            searchLabel.style = "margin-left: 5px;";
-            root.appendChild(searchLabel);
-            const searchInput = document.createElement("input");
-            searchInput.value = series.metadata.title ?? series.name;
-            searchInput.type = "text";
-            searchInput.size = "24";
-            searchInput.style = "all: revert; margin-left: 3px;";
-            root.appendChild(searchInput);
             const button = document.createElement("button");
             button.textContent = "Search " + name;
             button.style = "all: revert; margin: 3px;";
             root.appendChild(button);
-            const br = document.createElement("br");
-            root.appendChild(br);
-            return [urlInput, searchInput, button];
+            root.appendChild(document.createElement("br"));
+            return [urlInput, button];
         }
 
         const links = document.createElement("div");
-        const [muUrlInput, muSearchInput, muButton] = urlForm(
-            "MangaUpdates",
-            urls.mu,
-            links,
-        );
-        const [malUrlInput, malSearchInput, malButton] = urlForm(
+        const searchLabel = document.createElement("label");
+        searchLabel.textContent = "Search Term:";
+        searchLabel.style = "display: inline-block; width: 120px;";
+        links.appendChild(searchLabel);
+        const searchInput = document.createElement("input");
+        searchInput.value = series.metadata.title ?? series.name;
+        searchInput.type = "text";
+        searchInput.size = "80";
+        searchInput.style = "all: revert; margin-bottom: 0.75em;";
+        links.appendChild(searchInput);
+        links.appendChild(document.createElement("br"));
+
+        const [muUrlInput, muButton] = urlForm("MangaUpdates", urls.mu, links);
+        const [malUrlInput, malButton] = urlForm(
             "MyAnimeList",
             urls.mal,
             links,
         );
-        const [alUrlInput, alSearchInput, alButton] = urlForm(
-            "AniList",
-            urls.al,
-            links,
-        );
+        const [alUrlInput, alButton] = urlForm("AniList", urls.al, links);
         content.appendChild(links);
 
         const komgaSetLink = async (label, url) => {
@@ -365,23 +493,29 @@
             });
         };
 
+        const resultContainer = (name) => {
+            const header = document.createElement("h3");
+            header.textContent = name + " Results";
+            header.style = "margin-bottom: 1em; margin-top: 1em";
+            content.appendChild(header);
+            const list = document.createElement("div");
+            list.style =
+                "display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.5em";
+            content.appendChild(list);
+            return { header, list };
+        };
+
         muButton.addEventListener("click", async () => {
             GM.xmlHttpRequest({
-                url: API_MU + "/series/search",
+                url: MU_API + "/series/search",
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 data: JSON.stringify({
-                    search: muSearchInput.value,
+                    search: searchInput.value,
                 }),
                 onload: function (response) {
                     const data = JSON.parse(response.responseText);
-                    const header = document.createElement("h3");
-                    header.textContent = "MangaUpdates Results";
-                    header.style = "margin-bottom: 1em; margin-top: 1em";
-                    content.appendChild(header);
-                    const list = document.createElement("div");
-                    list.style =
-                        "display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.5em";
+                    const { header, list } = resultContainer("MangaUpdates");
                     for (const result of data.results) {
                         const record = result.record;
                         const r = document.createElement("div");
@@ -399,7 +533,6 @@
                             "all: revert; margin: 5px; margin-top: 1em;";
                         btn.addEventListener("click", async () => {
                             muUrlInput.value = record.url;
-                            muSearchInput.value = record.title;
                             await komgaSetLink("MangaUpdates", record.url);
                             header.remove();
                             list.remove();
@@ -407,16 +540,89 @@
                         r.appendChild(btn);
                         list.appendChild(r);
                     }
-                    content.appendChild(list);
                 },
+            });
+        });
+
+        malButton.addEventListener("click", async () => {
+            const url = new URL(MAL_API + "/manga");
+            url.searchParams.set("q", searchInput.value);
+            url.searchParams.set("fields", "start_date, media_type");
+            GM.xmlHttpRequest({
+                url: url.toString(),
+                method: "GET",
+                headers: {
+                    "X-MAL-CLIENT-ID": atob(DICLAM),
+                },
+                onload: (r) => {
+                    const data = JSON.parse(r.responseText);
+                    const { header, list } = resultContainer("MyAnimeList");
+                    for (const { node } of data.data) {
+                        const r = document.createElement("div");
+                        r.style = "border: 1px solid #000;";
+                        const mangaUrl =
+                            "https://myanimelist.net/manga/" + node.id;
+                        r.innerHTML = `
+                            <img src="${node.main_picture.medium}" style="float: left;">
+                            <div style="display: inline-block; padding: 5px;">
+                                <a href="${mangaUrl}" target="_blank">${node.title}</a><br>
+                                ${node.media_type} [${node.start_date}]<br>
+                            </div><br>
+                        `;
+                        const btn = document.createElement("button");
+                        btn.textContent = "Set URL";
+                        btn.style =
+                            "all: revert; margin: 5px; margin-top: 1em;";
+                        btn.addEventListener("click", async () => {
+                            malUrlInput.value = mangaUrl;
+                            await komgaSetLink("MyAnimeList", mangaUrl);
+                            header.remove();
+                            list.remove();
+                        });
+                        r.appendChild(btn);
+                        list.appendChild(r);
+                    }
+                },
+                onerror: (e) => console.log(e),
             });
         });
 
         document.body.appendChild(modal);
     }
 
-    function urlToSeriesId(url) {
-        const match = url.match(
+    async function malAuth() {
+        const url = new URL(window.location.href);
+        const state = await GM.getValue("mal_state");
+        if (url.searchParams.get("state") !== state) {
+            document.body.appendChild(
+                document.createTextNode(
+                    "Error: Authorization state does not match",
+                ),
+            );
+            return;
+        }
+        const challenge = await GM.getValue("mal_challenge");
+        const code = url.searchParams.get("code");
+        const r = await malToken(code, challenge).catch(() => false);
+        if (r) {
+            document.body.appendChild(
+                document.createTextNode(
+                    "Successfully authenticated with MyAnimeList ✅. You can now close this window.",
+                ),
+            );
+        } else {
+            document.body.appendChild(
+                document.createTextNode(
+                    "Failed to authenticate with MyAnimeList ⚠️. Error details were logged to console.",
+                ),
+            );
+        }
+        GM.deleteValue("mal_state");
+        GM.deleteValue("mal_challenge");
+    }
+
+    function urlToId(url) {
+        let match = url.match(
             /^https:\/\/(?:www\.)?mangaupdates\.com\/series\/([^/]+)/i,
         );
         if (match) {
@@ -424,5 +630,19 @@
             // Manick: The 7 character strings are just base 36 encoded versions of the new ID.
             return parseInt(match[1], 36);
         }
+        match = url.match(/^https:\/\/myanimelist\.net\/manga\/([^/]+)/i);
+        if (match) {
+            return parseInt(match[1], 10);
+        }
+    }
+
+    function randStr(length) {
+        const chars =
+            "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        var result = "";
+        for (var i = length; i > 0; --i) {
+            result += chars[Math.floor(Math.random() * chars.length)];
+        }
+        return result;
     }
 })();

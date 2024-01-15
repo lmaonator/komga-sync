@@ -1,6 +1,6 @@
 # komga-sync
 
-A userscript to sync chapter progress with MangaUpdates, AniList and MyAnimeList.
+A userscript to sync manga chapter progress with tracking websites.
 
 ## Usage
 
