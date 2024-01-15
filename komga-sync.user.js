@@ -104,7 +104,7 @@
                         (await updateMuListSeries(
                             muLink.url,
                             chapter.number,
-                        )) === true
+                        ).catch(() => false)) === true
                     ) {
                         console.log(
                             prefix + "Successfully synced with MangaUpdates",
@@ -118,17 +118,25 @@
         }
     }, 500);
 
-    async function getMuListSeries(url) {
+    async function muRequest(endpoint, method, data) {
         const token = await GM.getValue("mu_session_token");
         return new Promise((resolve, reject) => {
             GM.xmlHttpRequest({
-                url: API_MU + "/lists/series/" + urlToSeriesId(url),
-                method: "GET",
+                url: API_MU + endpoint,
+                method,
                 headers: {
                     Authorization: "Bearer " + token,
+                    "Content-Type": "application/json",
                 },
+                data: data !== undefined ? JSON.stringify(data) : undefined,
                 onload: function (response) {
-                    resolve(JSON.parse(response.responseText));
+                    if (response.status === 401) {
+                        GM.setValue("mu_session_token", "");
+                        alert(
+                            "MangaUpdates session expired, please login again.",
+                        );
+                    }
+                    resolve(response);
                 },
                 onerror: function (error) {
                     console.error(error);
@@ -141,43 +149,32 @@
     async function updateMuListSeries(url, chapterNum) {
         chapterNum = Math.floor(chapterNum);
 
-        const current = await getMuListSeries(url);
+        const token = await GM.getValue("mu_session_token", "");
+        if (token === "") {
+            return false;
+        }
 
+        let r = await muRequest("/lists/series/" + urlToSeriesId(url), "GET");
+        const current = JSON.parse(r.responseText);
         if (current.status.chapter >= chapterNum) {
             return true;
         }
 
-        const token = await GM.getValue("mu_session_token");
-        return new Promise((resolve, reject) => {
-            GM.xmlHttpRequest({
-                url: API_MU + "/lists/series/update",
-                method: "POST",
-                headers: {
-                    Authorization: "Bearer " + token,
-                    "Content-Type": "application/json",
+        r = await muRequest("/lists/series/update", "POST", [
+            {
+                series: {
+                    id: urlToSeriesId(url),
                 },
-                data: JSON.stringify([
-                    {
-                        series: {
-                            id: urlToSeriesId(url),
-                        },
-                        status: {
-                            chapter: chapterNum,
-                        },
-                    },
-                ]),
-                onload: function (response) {
-                    if (response.status === 200) {
-                        resolve(true);
-                    }
-                    resolve(false);
+                status: {
+                    chapter: chapterNum,
                 },
-                onerror: function (error) {
-                    console.error(error);
-                    reject(false);
-                },
-            });
-        });
+            },
+        ]);
+        if (r.status === 200) {
+            return true;
+        } else {
+            return false;
+        }
     }
 
     /** @type {HTMLDivElement } */
@@ -232,6 +229,9 @@
                 },
             });
         });
+        if ((await GM.getValue("mu_session_token", "")) !== "") {
+            content.appendChild(document.createTextNode(" Logged in ✅"));
+        }
 
         // get series metadata
         const r = await fetch("/api/v1/series/" + seriesId);
