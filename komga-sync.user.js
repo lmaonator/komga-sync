@@ -9,6 +9,9 @@
 // @version     1.0
 // @author      lmaonator
 // @description Sync chapter progress with MangaUpdates
+// @homepageURL https://github.com/lmaonator/komga-sync
+// @supportURL  https://github.com/lmaonator/komga-sync/issues
+// @downloadURL https://github.com/lmaonator/komga-sync/raw/main/komga-sync.user.js
 // ==/UserScript==
 
 (async () => {
