@@ -9,10 +9,28 @@
 // @version     1.0
 // @author      lmaonator
 // @description Sync chapter progress with MangaUpdates
+// @license     GPL-3.0-or-later
 // @homepageURL https://github.com/lmaonator/komga-sync
 // @supportURL  https://github.com/lmaonator/komga-sync/issues
 // @downloadURL https://github.com/lmaonator/komga-sync/raw/main/komga-sync.user.js
 // ==/UserScript==
+//
+// komga-sync: a userscript to sync manga chapter progress with tracking websites.
+// Copyright (C) 2024  lmaonator
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+//
 
 (async () => {
     if (!document.title.startsWith("Komga")) return;
