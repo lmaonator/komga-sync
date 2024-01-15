@@ -69,15 +69,19 @@
         if (match) {
             const seriesId = match[1];
             if (!buttonInserted) {
+                const spacer = document.querySelector(
+                    "main header > div.v-toolbar__content div.spacer",
+                );
+                // sometimes the interval fires before the page is fully rendered
+                if (spacer === null) {
+                    return;
+                }
                 // Add UI button :3
                 const button = document.createElement("button");
                 button.innerText = "Komga Sync";
                 button.className =
                     "v-btn v-btn--icon v-btn--round theme--dark v-size--default";
                 button.style = "width: 120px;";
-                const spacer = document.querySelector(
-                    "main header > div.v-toolbar__content div.spacer",
-                );
                 button.addEventListener("click", async () =>
                     createUI(seriesId),
                 );
