@@ -326,7 +326,8 @@
 
         const content = document.createElement("div");
         content.style =
-            "font-family: sans-serif; color: #000; background-color: #fff; margin: auto; padding: 1em; border: 1px solid #AAA; width: 80%;";
+            "font-family: sans-serif; color: #ffffff; background-color: #1e1e1e; margin: auto; width: 80%; padding: 1em; border: 1px solid #696969; border-radius: 10px;" +
+            "box-shadow: rgba(0, 0, 0, 0.35) 0px 5px 15px;";
         modal.appendChild(content);
 
         const closeModal = (e) => {
@@ -497,15 +498,19 @@
             });
         };
 
-        const resultContainer = (name) => {
+        const resultContainer = document.createElement("div");
+        content.appendChild(resultContainer);
+
+        const prepareResult = (name) => {
+            resultContainer.innerHTML = "";
             const header = document.createElement("h3");
             header.textContent = name + " Results";
             header.style = "margin-bottom: 1em; margin-top: 1em";
-            content.appendChild(header);
+            resultContainer.appendChild(header);
             const list = document.createElement("div");
             list.style =
                 "display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.5em";
-            content.appendChild(list);
+            resultContainer.appendChild(list);
             return { header, list };
         };
 
@@ -519,7 +524,7 @@
                 }),
                 onload: function (response) {
                     const data = JSON.parse(response.responseText);
-                    const { header, list } = resultContainer("MangaUpdates");
+                    const { header, list } = prepareResult("MangaUpdates");
                     for (const result of data.results) {
                         const record = result.record;
                         const r = document.createElement("div");
@@ -538,8 +543,6 @@
                         btn.addEventListener("click", async () => {
                             muUrlInput.value = record.url;
                             await komgaSetLink("MangaUpdates", record.url);
-                            header.remove();
-                            list.remove();
                         });
                         r.appendChild(btn);
                         list.appendChild(r);
@@ -561,14 +564,14 @@
                 },
                 onload: (r) => {
                     const data = JSON.parse(r.responseText);
-                    const { header, list } = resultContainer("MyAnimeList");
+                    const { header, list } = prepareResult("MyAnimeList");
                     for (const { node } of data.data) {
                         const r = document.createElement("div");
                         r.style = "border: 1px solid #000;";
                         const mangaUrl =
                             "https://myanimelist.net/manga/" + node.id;
                         r.innerHTML = `
-                            <img src="${node.main_picture.medium}" style="float: left;">
+                            <img src="${node.main_picture.medium}" height="150" style="float: left;">
                             <div style="display: inline-block; padding: 5px;">
                                 <a href="${mangaUrl}" target="_blank">${node.title}</a><br>
                                 ${node.media_type} [${node.start_date}]<br>
@@ -581,8 +584,6 @@
                         btn.addEventListener("click", async () => {
                             malUrlInput.value = mangaUrl;
                             await komgaSetLink("MyAnimeList", mangaUrl);
-                            header.remove();
-                            list.remove();
                         });
                         r.appendChild(btn);
                         list.appendChild(r);
