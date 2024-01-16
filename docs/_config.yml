@@ -1,3 +1,4 @@
 theme: jekyll-theme-cayman
 include:
   - auth-mal.html
+  - auth-anilist.html

@@ -40,10 +40,15 @@
     const MU_API = "https://api.mangaupdates.com/v1";
     const MAL_OAUTH = "https://myanimelist.net/v1/oauth2";
     const MAL_API = "https://api.myanimelist.net/v2";
+    const ANILIST_OAUTH = "https://anilist.co/api/v2/oauth";
+    const ANILIST_API = "https://graphql.anilist.co";
     const DICLAM = "ZjE4NDIxNGY4MTg4Y2RmNzEwZmM4N2MwMzMzYzhlMGM";
+    const DICLA = "MTYzNDc";
 
     if (document.title === "komga-sync MAL auth") {
         return malAuth();
+    } else if (document.title === "komga-sync AniList auth") {
+        return aniListAuth();
     }
 
     if (!document.title.startsWith("Komga")) return;
@@ -136,16 +141,22 @@
                 const sites = [
                     ["MangaUpdates", updateMuListSeries],
                     ["MyAnimeList", updateMalListStatus],
+                    ["AniList", updateAniListEntry],
                 ];
                 for (const [site, func] of sites) {
                     const link = chapter.links.find((i) => i.label === site);
                     if (link) {
-                        const r = await func(url, chapter.number).catch(
-                            () => false,
-                        );
-                        if (r === true) {
-                            console.log(
-                                prefix + "Successfully synced with " + site,
+                        try {
+                            const r = await func(link.url, chapter.number);
+                            if (r === true) {
+                                console.log(
+                                    prefix + "Successfully synced with " + site,
+                                );
+                            }
+                        } catch (error) {
+                            console.error(
+                                prefix + "Error syncing with " + site,
+                                error,
                             );
                         }
                     }
@@ -161,8 +172,20 @@
     const malTokenExpiresAt = await GM.getValue("mal_expires_at", null);
     if (malTokenExpiresAt !== null) {
         if (malTokenExpiresAt <= Date.now()) {
+            await GM.deleteValue("mal_access_token");
             await GM.deleteValue("mal_expires_at");
             alert("MyAnimeList session has expired, please login again.");
+        }
+    }
+    const alTokenExpiresAt = await GM.getValue("anilist_expires_at", null);
+    if (alTokenExpiresAt !== null) {
+        if (alTokenExpiresAt <= Date.now()) {
+            await GM.deleteValue("anilist_access_token");
+            await GM.deleteValue("anilist_expires_at");
+            alert("AniList session has expired, please login again.");
+        } else if (alTokenExpiresAt - 604800_000 <= Date.now()) {
+            // 1 week before expiration
+            alert("AniList session will expire soon, please login again.");
         }
     }
 
@@ -326,6 +349,155 @@
         }
     }
 
+    async function aniListRequest(query, variables) {
+        const accessToken = await GM.getValue("anilist_access_token");
+        return new Promise((resolve, reject) => {
+            GM.xmlHttpRequest({
+                url: ANILIST_API,
+                method: "POST",
+                headers: {
+                    Authorization: "Bearer " + accessToken,
+                    "Content-Type": "application/json",
+                    Accept: "application/json",
+                },
+                data: JSON.stringify({
+                    query: query,
+                    variables: variables,
+                }),
+                onload: async (r) => {
+                    if (
+                        r.status === 400 &&
+                        r.responseText.includes("Invalid token")
+                    ) {
+                        await GM.deleteValue("anilist_access_token");
+                        await GM.deleteValue("anilist_expires_at");
+                        alert(
+                            "AniList session has expired, please login again.",
+                        );
+                    }
+                    return resolve(r);
+                },
+                onerror: (e) => {
+                    console.error(e);
+                    return reject(e);
+                },
+            });
+        });
+    }
+
+    async function updateAniListEntry(url, chapterNum) {
+        const aniListId = urlToId(url);
+        chapterNum = Math.floor(chapterNum);
+
+        let r = await aniListRequest(
+            `
+            query ($id: Int) {
+                Media(id: $id, type: MANGA) {
+                    id
+                    chapters
+                    mediaListEntry {
+                        id
+                        status
+                        progress
+                        repeat
+                        startedAt {
+                            year
+                            month
+                            day
+                        }
+                        completedAt {
+                            year
+                            month
+                            day
+                        }
+                    }
+                }
+            }
+            `,
+            { id: aniListId },
+        );
+        let data = JSON.parse(r.responseText);
+        if (data.errors?.length > 0) {
+            console.error(data.errors);
+            return false;
+        }
+        const manga = data.data.Media;
+        const mle = manga.mediaListEntry;
+
+        if (mle.progress >= chapterNum) {
+            return true;
+        }
+
+        const date = new Date();
+        const currentDate = {
+            year: date.getFullYear(),
+            month: date.getMonth() + 1,
+            day: date.getDate(),
+        };
+        const vars = {
+            progress: chapterNum,
+        };
+        if (manga.chapters == chapterNum) {
+            vars.status = "COMPLETED";
+            vars.completedAt = currentDate;
+        } else {
+            vars.status = "CURRENT";
+        }
+
+        if (mle === undefined) {
+            // create new mediaListEntry
+            vars.mediaId = aniListId;
+            vars.startedAt = currentDate;
+        } else if (
+            ["CURRENT", "DROPPED", "PAUSED", "PLANNING"].includes(mle.status)
+        ) {
+            // update mediaListEntry
+            vars.id = mle.id;
+        } else {
+            // already completed, do nothing
+            return true;
+        }
+        r = await aniListRequest(
+            `
+            mutation (
+                $id: Int, $mediaId: Int,
+                $status: MediaListStatus, $progress: Int, $repeat: Int,
+                $startedAt: FuzzyDateInput, $completedAt: FuzzyDateInput
+            ) {
+                SaveMediaListEntry (
+                    id: $id, mediaId: $mediaId,
+                    status: $status, progress: $progress, repeat: $repeat,
+                    startedAt: $startedAt, completedAt: $completedAt
+                ) {
+                    id
+                    mediaId
+                    status
+                    progress
+                    repeat
+                    startedAt {
+                        year
+                        month
+                        day
+                    }
+                    completedAt {
+                        year
+                        month
+                        day
+                    }
+                }
+            }
+            `,
+            vars,
+        );
+        data = JSON.parse(r.responseText);
+        if (data.errors?.length > 0) {
+            console.error(data.errors);
+            return false;
+        } else {
+            return true;
+        }
+    }
+
     /** @type {HTMLDivElement } */
     let modal = null;
 
@@ -333,11 +505,13 @@
         // Create Modal Dialog
         modal = document.createElement("div");
         modal.style =
-            "z-index: 300; position: fixed; padding-top: 100px; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4);";
+            "z-index: 300; position: fixed; padding-top: 100px; left: 0; top: 0; width: 100%;" +
+            "height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4);";
 
         const content = document.createElement("div");
         content.style =
-            "font-family: sans-serif; color: #ffffff; background-color: #1e1e1e; margin: auto; width: 80%; padding: 1em; border: 1px solid #696969; border-radius: 10px;" +
+            "font-family: sans-serif; color: #ffffff; background-color: #1e1e1e; margin: auto;" +
+            "width: 80%; padding: 1em; border: 1px solid #696969; border-radius: 10px;" +
             "box-shadow: rgba(0, 0, 0, 0.35) 0px 5px 15px;";
         modal.appendChild(content);
 
@@ -406,6 +580,24 @@
         if ((await GM.getValue("mal_access_token", "")) !== "") {
             content.appendChild(document.createTextNode(" Logged in ✅"));
         }
+        content.appendChild(document.createElement("br"));
+
+        // AniList login
+        const aniListLogin = document.createElement("button");
+        aniListLogin.innerText = "AniList Login";
+        aniListLogin.style = "all: revert; margin: 3px;";
+        content.appendChild(aniListLogin);
+        aniListLogin.addEventListener("click", () => {
+            const params = new URLSearchParams({
+                client_id: atob(DICLA),
+                response_type: "token",
+            });
+            GM.openInTab(ANILIST_OAUTH + "/authorize?" + params.toString());
+        });
+        if ((await GM.getValue("anilist_access_token", "")) !== "") {
+            content.appendChild(document.createTextNode(" Logged in ✅"));
+        }
+        content.appendChild(document.createElement("br"));
 
         // get series metadata
         const r = await fetch("/api/v1/series/" + seriesId);
@@ -491,6 +683,13 @@
             links,
         );
         const [alUrlInput, alButton] = urlForm("AniList", urls.al, links);
+        alButton.parentNode.insertBefore(
+            document.createTextNode(
+                " Note: AniList has MyAnimeList IDs for most entries, if MAL is still " +
+                    "missing it will also be added if available.",
+            ),
+            alButton.nextSibling,
+        );
         content.appendChild(links);
 
         const komgaSetLink = async (label, url) => {
@@ -505,6 +704,9 @@
                     links,
                 }),
             });
+            if (r.status === 204) {
+                series.metadata.links = links;
+            }
         };
 
         const resultContainer = document.createElement("div");
@@ -523,6 +725,24 @@
             return { header, list };
         };
 
+        const resultCard = (picture, url, title, type, date, extra) => {
+            const card = document.createElement("div");
+            card.style = "border: 1px solid #000; background-color: #363636";
+            card.innerHTML = `
+                <img src="${picture}" height="150" style="float: left;">
+                <div style="display: inline-block; padding: 5px;">
+                    <a href="${url}" target="_blank" style="color: #fff; font-weight: bold;">${title}</a><br>
+                    ${type} [${date}]<br>
+                    ${extra ?? ""}
+                </div><br>
+            `;
+            const button = document.createElement("button");
+            button.textContent = "Set URL";
+            button.style = "all: revert; margin: 5px; margin-top: 1em;";
+            card.appendChild(button);
+            return { card, button };
+        };
+
         muButton.addEventListener("click", async () => {
             GM.xmlHttpRequest({
                 url: MU_API + "/series/search",
@@ -534,29 +754,22 @@
                 onload: function (response) {
                     const data = JSON.parse(response.responseText);
                     const { header, list } = prepareResult("MangaUpdates");
-                    for (const result of data.results) {
-                        const record = result.record;
-                        const r = document.createElement("div");
-                        r.style = "border: 1px solid #000;";
-                        r.innerHTML = `
-                            <img src="${record.image.url.thumb}" style="float: left;">
-                            <div style="display: inline-block; padding: 5px;">
-                                <a href="${record.url}" target="_blank">${record.title}</a><br>
-                                ${record.type} [${record.year}]<br>
-                            </div><br>
-                        `;
-                        const btn = document.createElement("button");
-                        btn.textContent = "Set URL";
-                        btn.style =
-                            "all: revert; margin: 5px; margin-top: 1em;";
-                        btn.addEventListener("click", async () => {
+                    for (const { record } of data.results) {
+                        const { card, button } = resultCard(
+                            record.image.url.thumb,
+                            record.url,
+                            record.title,
+                            record.type,
+                            record.year,
+                        );
+                        button.addEventListener("click", async () => {
                             muUrlInput.value = record.url;
                             await komgaSetLink("MangaUpdates", record.url);
                         });
-                        r.appendChild(btn);
-                        list.appendChild(r);
+                        list.appendChild(card);
                     }
                 },
+                onerror: (e) => console.error(e),
             });
         });
 
@@ -575,30 +788,92 @@
                     const data = JSON.parse(r.responseText);
                     const { header, list } = prepareResult("MyAnimeList");
                     for (const { node } of data.data) {
-                        const r = document.createElement("div");
-                        r.style = "border: 1px solid #000;";
                         const mangaUrl =
                             "https://myanimelist.net/manga/" + node.id;
-                        r.innerHTML = `
-                            <img src="${node.main_picture.medium}" height="150" style="float: left;">
-                            <div style="display: inline-block; padding: 5px;">
-                                <a href="${mangaUrl}" target="_blank">${node.title}</a><br>
-                                ${node.media_type} [${node.start_date}]<br>
-                            </div><br>
-                        `;
-                        const btn = document.createElement("button");
-                        btn.textContent = "Set URL";
-                        btn.style =
-                            "all: revert; margin: 5px; margin-top: 1em;";
-                        btn.addEventListener("click", async () => {
+                        const { card, button } = resultCard(
+                            node.main_picture.medium,
+                            mangaUrl,
+                            node.title,
+                            node.media_type,
+                            node.start_date,
+                        );
+                        button.addEventListener("click", async () => {
                             malUrlInput.value = mangaUrl;
                             await komgaSetLink("MyAnimeList", mangaUrl);
                         });
-                        r.appendChild(btn);
-                        list.appendChild(r);
+                        list.appendChild(card);
                     }
                 },
-                onerror: (e) => console.log(e),
+                onerror: (e) => console.error(e),
+            });
+        });
+
+        alButton.addEventListener("click", async () => {
+            const data = {
+                query: `
+                    query ($search: String) {
+                        Page {
+                            media(search: $search, type: MANGA) {
+                            id
+                            idMal
+                            title {
+                                romaji
+                                english
+                                native
+                            }
+                            format
+                            status
+                            startDate {
+                                year
+                            }
+                            coverImage {
+                                medium
+                            }
+                            synonyms
+                            siteUrl
+                            }
+                        }
+                    }
+                `,
+                variables: {
+                    search: searchInput.value,
+                },
+            };
+            GM.xmlHttpRequest({
+                url: ANILIST_API,
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Accept: "application/json",
+                },
+                data: JSON.stringify(data),
+                onload: (r) => {
+                    const data = JSON.parse(r.responseText);
+                    const { header, list } = prepareResult("AniList");
+                    for (const m of data.data.Page.media) {
+                        const { card, button } = resultCard(
+                            m.coverImage.medium,
+                            m.siteUrl,
+                            m.title.english ?? m.title.romaji ?? m.title.native,
+                            m.format + " " + m.status,
+                            m.startDate.year,
+                            "Synonyms:<br>" +
+                                m.synonyms.slice(0, 3).join("<br>"),
+                        );
+                        button.addEventListener("click", async () => {
+                            await komgaSetLink("AniList", m.siteUrl);
+                            alUrlInput.value = m.siteUrl;
+                            if (m.idMal !== null && malUrlInput.value === "") {
+                                const malUrl =
+                                    "https://myanimelist.net/manga/" + m.idMal;
+                                await komgaSetLink("MyAnimeList", malUrl);
+                                malUrlInput.value = malUrl;
+                            }
+                        });
+                        list.appendChild(card);
+                    }
+                },
+                onerror: (e) => console.error(e),
             });
         });
 
@@ -636,6 +911,30 @@
         GM.deleteValue("mal_challenge");
     }
 
+    async function aniListAuth() {
+        const url = new URL(window.location.href);
+        const params = new URLSearchParams(url.hash.slice(1));
+        const access_token = params.get("access_token");
+        if (access_token !== null) {
+            await GM.setValue("anilist_access_token", access_token);
+            await GM.setValue(
+                "anilist_expires_at",
+                parseInt(params.get("expires_in"), 10) * 1000 + Date.now(),
+            );
+            document.body.appendChild(
+                document.createTextNode(
+                    "Successfully authenticated with AniList ✅. You can now close this window.",
+                ),
+            );
+        } else {
+            document.body.appendChild(
+                document.createTextNode(
+                    "Failed to authenticate with AniList ⚠️. Please try again.",
+                ),
+            );
+        }
+    }
+
     function urlToId(url) {
         let match = url.match(
             /^https:\/\/(?:www\.)?mangaupdates\.com\/series\/([^/]+)/i,
@@ -645,7 +944,13 @@
             // Manick: The 7 character strings are just base 36 encoded versions of the new ID.
             return parseInt(match[1], 36);
         }
-        match = url.match(/^https:\/\/myanimelist\.net\/manga\/([^/]+)/i);
+        match = url.match(
+            /^https:\/\/(?:www\.)?myanimelist\.net\/manga\/([^/]+)/i,
+        );
+        if (match) {
+            return parseInt(match[1], 10);
+        }
+        match = url.match(/^https:\/\/(?:www\.)?anilist\.co\/manga\/([^/]+)/i);
         if (match) {
             return parseInt(match[1], 10);
         }
