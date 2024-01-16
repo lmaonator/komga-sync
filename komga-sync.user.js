@@ -157,6 +157,15 @@
         }
     }, 500);
 
+    // Check if tokens are expired based on documented expiration times
+    const malTokenExpiresAt = await GM.getValue("mal_expires_at", null);
+    if (malTokenExpiresAt !== null) {
+        if (malTokenExpiresAt <= Date.now()) {
+            await GM.deleteValue("mal_expires_at");
+            alert("MyAnimeList session has expired, please login again.");
+        }
+    }
+
     async function muRequest(endpoint, method, data) {
         const token = await GM.getValue("mu_session_token");
         return new Promise((resolve, reject) => {
@@ -247,6 +256,8 @@
                         const data = JSON.parse(r.responseText);
                         GM.setValue("mal_access_token", data.access_token);
                         GM.setValue("mal_refresh_token", data.refresh_token);
+                        // MAL refresh tokens are valid for 1 month
+                        GM.setValue("mal_expires_at", Date.now() + 2592000_000);
                         return resolve(true);
                     }
                     alert("MyAnimeList session expired, please login again.");
@@ -380,19 +391,17 @@
         content.appendChild(malLogin);
         malLogin.addEventListener("click", async () => {
             const state = randStr(16);
-            const challenge = randStr(64);
+            const code_challenge = randStr(64);
             await GM.setValue("mal_state", state);
-            await GM.setValue("mal_challenge", challenge);
-            GM.openInTab(
-                MAL_OAUTH +
-                    "/authorize?response_type=code&client_id=" +
-                    atob(DICLAM) +
-                    "&state=" +
-                    state +
-                    "&code_challenge=" +
-                    challenge +
-                    "&code_challenge_method=plain",
-            );
+            await GM.setValue("mal_challenge", code_challenge);
+            const params = new URLSearchParams({
+                response_type: "code",
+                client_id: atob(DICLAM),
+                state,
+                code_challenge,
+                code_challenge_method: "plain",
+            });
+            GM.openInTab(AL_OAUTH + "/authorize?" + params.toString());
         });
         if ((await GM.getValue("mal_access_token", "")) !== "") {
             content.appendChild(document.createTextNode(" Logged in ✅"));
