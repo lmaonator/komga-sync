@@ -552,6 +552,7 @@
             const url = new URL(MAL_API + "/manga");
             url.searchParams.set("q", searchInput.value);
             url.searchParams.set("fields", "start_date, media_type");
+            url.searchParams.set("nsfw", "true");
             GM.xmlHttpRequest({
                 url: url.toString(),
                 method: "GET",
