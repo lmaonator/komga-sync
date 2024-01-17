@@ -1,21 +1,21 @@
 // ==UserScript==
 // @name        komga-sync
+// @version     1.0
+// @author      lmaonator
+// @description Sync manga chapter progress with tracking websites.
+// @license     GPL-3.0-or-later
 // @namespace   https://github.com/lmaonator/komga-sync
+// @homepageURL https://github.com/lmaonator/komga-sync
+// @supportURL  https://github.com/lmaonator/komga-sync/issues
+// @downloadURL https://github.com/lmaonator/komga-sync/raw/main/komga-sync.user.js
+// @match       http*://komga.*/*
+// @match       http*://*/komga/*
+// @match       https://lmaonator.github.io/komga-sync/auth-*.html*
 // @grant       GM.xmlHttpRequest
 // @grant       GM.getValue
 // @grant       GM.setValue
 // @grant       GM.deleteValue
 // @grant       GM.openInTab
-// @match       http*://komga.*/*
-// @match       http*://*/komga/*
-// @match       https://lmaonator.github.io/komga-sync/auth-*.html*
-// @version     1.0
-// @author      lmaonator
-// @description Sync manga chapter progress with tracking websites.
-// @license     GPL-3.0-or-later
-// @homepageURL https://github.com/lmaonator/komga-sync
-// @supportURL  https://github.com/lmaonator/komga-sync/issues
-// @downloadURL https://github.com/lmaonator/komga-sync/raw/main/komga-sync.user.js
 // ==/UserScript==
 //
 // komga-sync: a userscript to sync manga chapter progress with tracking websites.
@@ -502,21 +502,79 @@
     const host = document.createElement("div");
     document.body.appendChild(host);
     const shadow = host.attachShadow({ mode: "open" });
-    /** @type {HTMLDivElement } */
-    let modal = null;
+    const shadowStyle = document.createElement("style");
+    shadowStyle.textContent = `
+    .modal {
+        z-index: 300;
+        position: fixed;
+        padding-top: 100px;
+        transform: translate(0, 0);
+        left: 0;
+        top: 0;
+        bottom: 0;
+        right: 0;
+        width: auto;
+        height: auto;
+        overflow: auto;
+        background-color: rgba(0, 0, 0, 0.8);
+        overscroll-behavior: contain;
+    }
+    
+    .content {
+        font-family: Roboto, sans-serif;
+        font-size: 16px;
+        color: #ffffff;
+        background-color: #121212;
+        margin: auto;
+        width: 80%;
+        padding: 1em;
+        border: 1px solid #696969;
+        border-radius: 10px;
+    }
+    
+    .button {
+        background-color: #303030;
+        border: 2px solid #303030;
+        border-radius: 5px;
+        color: #ffffff;
+        padding: 6px 16px;
+        text-align: center;
+        text-decoration: none;
+        display: inline-block;
+        font-size: 16px;
+        margin: 2px;
+        transition-duration: 0.2s;
+        cursor: pointer;
+    }
+    
+    .button:hover {
+        background-color: #ffffff;
+        color: #000000;
+    }
+    
+    input[type=text],
+    input[type=url] {
+        padding: 5px;
+        margin: 2px;
+        box-sizing: border-box;
+        border: 1px solid #303030;
+        border-radius: 5px;
+        color: #ffffff;
+        background-color: #303030;
+        font-size: 16px;
+        width: 100%;
+        max-width: 800px;
+    }
+    `;
+    shadow.appendChild(shadowStyle);
 
     async function createUI(seriesId) {
         // Create Modal Dialog
         modal = document.createElement("div");
-        modal.style =
-            "z-index: 300; position: fixed; padding-top: 100px; left: 0; top: 0; width: 100%;" +
-            "height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4);";
+        modal.classList.add("modal");
 
         const content = document.createElement("div");
-        content.style =
-            "font-family: sans-serif; color: #ffffff; background-color: #1e1e1e; margin: auto;" +
-            "width: 80%; padding: 1em; border: 1px solid #696969; border-radius: 10px;" +
-            "box-shadow: rgba(0, 0, 0, 0.35) 0px 5px 15px;";
+        content.classList.add("content");
         modal.appendChild(content);
 
         const closeModal = (e) => {
@@ -531,7 +589,8 @@
         // MangaUpdates login
         const muLogin = document.createElement("button");
         muLogin.innerText = "MangaUpdates Login";
-        muLogin.style = "all: revert; margin: 3px;";
+        muLogin.classList.add("button");
+        muLogin.style.width = "200px";
         content.appendChild(muLogin);
         muLogin.addEventListener("click", async () => {
             const username = prompt("MangaUpdates username:");
@@ -565,7 +624,8 @@
         // MyAnimeList login
         const malLogin = document.createElement("button");
         malLogin.innerText = "MyAnimeList Login";
-        malLogin.style = "all: revert; margin: 3px;";
+        malLogin.classList.add("button");
+        malLogin.style.width = "200px";
         content.appendChild(malLogin);
         malLogin.addEventListener("click", async () => {
             const state = randStr(16);
@@ -589,7 +649,8 @@
         // AniList login
         const aniListLogin = document.createElement("button");
         aniListLogin.innerText = "AniList Login";
-        aniListLogin.style = "all: revert; margin: 3px;";
+        aniListLogin.classList.add("button");
+        aniListLogin.style.width = "200px";
         content.appendChild(aniListLogin);
         aniListLogin.addEventListener("click", () => {
             const params = new URLSearchParams({
@@ -656,29 +717,15 @@
             const urlInput = document.createElement("input");
             urlInput.type = "url";
             urlInput.value = url;
-            urlInput.size = "80";
-            urlInput.style = "all: revert;";
             root.appendChild(urlInput);
             const button = document.createElement("button");
             button.textContent = "Search " + name;
-            button.style = "all: revert; margin: 3px;";
-            root.appendChild(button);
+            button.classList.add("button");
             root.appendChild(document.createElement("br"));
             return [urlInput, button];
         }
 
         const links = document.createElement("div");
-        const searchLabel = document.createElement("label");
-        searchLabel.textContent = "Search Term:";
-        searchLabel.style = "display: inline-block; width: 120px;";
-        links.appendChild(searchLabel);
-        const searchInput = document.createElement("input");
-        searchInput.value = series.metadata.title ?? series.name;
-        searchInput.type = "text";
-        searchInput.size = "80";
-        searchInput.style = "all: revert; margin-bottom: 0.75em;";
-        links.appendChild(searchInput);
-        links.appendChild(document.createElement("br"));
 
         const [muUrlInput, muButton] = urlForm("MangaUpdates", urls.mu, links);
         const [malUrlInput, malButton] = urlForm(
@@ -687,13 +734,30 @@
             links,
         );
         const [alUrlInput, alButton] = urlForm("AniList", urls.al, links);
-        alButton.parentNode.insertBefore(
-            document.createTextNode(
-                " Note: AniList has MyAnimeList IDs for most entries, if MAL is still " +
-                    "missing it will also be added if available.",
-            ),
-            alButton.nextSibling,
-        );
+
+        const searchLabel = document.createElement("label");
+        searchLabel.textContent = "Search Term:";
+        searchLabel.style = "display: inline-block; width: 120px;";
+        links.appendChild(searchLabel);
+        const searchInput = document.createElement("input");
+        searchInput.value = series.metadata.title ?? series.name;
+        searchInput.type = "text";
+        searchInput.size = "80";
+        searchInput.style = "margin-top: 16px;";
+        links.appendChild(searchInput);
+
+        const buttonContainer = document.createElement("div");
+        buttonContainer.style = "margin-top: 8px;";
+        buttonContainer.appendChild(muButton);
+        buttonContainer.appendChild(malButton);
+        buttonContainer.appendChild(alButton);
+        links.appendChild(buttonContainer);
+        const note = document.createElement("div");
+        note.style = "font-size: 14px; margin: 5px 2px;";
+        note.textContent =
+            " Note: AniList has MyAnimeList IDs for most entries, if MAL is still " +
+            "missing it will also be added if available.";
+        links.appendChild(note);
         content.appendChild(links);
 
         const komgaSetLink = async (label, url) => {
