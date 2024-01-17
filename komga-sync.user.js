@@ -498,6 +498,10 @@
         }
     }
 
+    // Create Shadow DOM
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const shadow = host.attachShadow({ mode: "open" });
     /** @type {HTMLDivElement } */
     let modal = null;
 
@@ -522,7 +526,7 @@
             }
         };
 
-        window.addEventListener("click", closeModal);
+        shadow.addEventListener("click", closeModal);
 
         // MangaUpdates login
         const muLogin = document.createElement("button");
@@ -877,7 +881,7 @@
             });
         });
 
-        document.body.appendChild(modal);
+        shadow.appendChild(modal);
     }
 
     async function malAuth() {
