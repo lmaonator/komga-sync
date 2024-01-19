@@ -200,7 +200,7 @@
                     "Content-Type": "application/json",
                 },
                 data: data !== undefined ? JSON.stringify(data) : undefined,
-                onload: function (response) {
+                onload: (response) => {
                     if (response.status === 401) {
                         GM.setValue("mu_session_token", "");
                         alert(
@@ -209,7 +209,7 @@
                     }
                     return resolve(response);
                 },
-                onerror: function (error) {
+                onerror: (error) => {
                     console.error(error);
                     return reject(error);
                 },
@@ -324,7 +324,7 @@
                     }
                     return resolve(r);
                 },
-                onerror: function (e) {
+                onerror: (e) => {
                     console.error(e);
                     return reject(e);
                 },
@@ -692,7 +692,7 @@
                     username,
                     password,
                 }),
-                onload: async function (response) {
+                onload: async (response) => {
                     const data = JSON.parse(response.responseText);
                     if (data.status === "success") {
                         await GM.setValue(
@@ -932,7 +932,7 @@
                 data: JSON.stringify({
                     search: searchInput.value,
                 }),
-                onload: function (response) {
+                onload: (response) => {
                     const data = JSON.parse(response.responseText);
                     const { header, list } = prepareResult("MangaUpdates");
                     for (const { record } of data.results) {
