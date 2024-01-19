@@ -82,14 +82,16 @@
                     return;
                 }
                 // Add UI button :3
-                const button = document.createElement("button");
-                button.innerText = "Komga Sync";
-                button.className =
-                    "v-btn v-btn--icon v-btn--round theme--dark v-size--default";
-                button.style = "width: 120px;";
-                button.addEventListener("click", async () =>
-                    createUI(seriesId),
-                );
+                const button = createElement("button", {
+                    className:
+                        "v-btn v-btn--icon v-btn--round theme--dark v-size--default",
+                    style: "width: 120px;",
+                    textContent: "Komga Sync",
+                });
+                button.addEventListener("click", () => {
+                    createUI(seriesId);
+                    button.blur();
+                });
                 spacer.parentNode.insertBefore(button, spacer.nextSibling);
                 buttonInserted = true;
             }
@@ -666,18 +668,28 @@
         content.classList.add("content");
         modal.appendChild(content);
 
-        const closeModal = (e) => {
+        function closeModalClick(e) {
             if (e.target == modal) {
                 modal.remove();
-                window.removeEventListener("click", closeModal);
+                shadow.removeEventListener("click", closeModalClick);
+                window.removeEventListener("keydown", closeModalKey);
             }
-        };
+        }
 
-        shadow.addEventListener("click", closeModal);
+        function closeModalKey(e) {
+            if (e.code === "Escape") {
+                modal.remove();
+                shadow.removeEventListener("click", closeModalClick);
+                window.removeEventListener("keydown", closeModalKey);
+            }
+        }
+
+        shadow.addEventListener("click", closeModalClick);
+        window.addEventListener("keydown", closeModalKey);
 
         // MangaUpdates login
         const muLogin = document.createElement("button");
-        muLogin.innerText = "MangaUpdates Login";
+        muLogin.textContent = "MangaUpdates Login";
         muLogin.classList.add("button");
         muLogin.style.width = "200px";
         content.appendChild(muLogin);
@@ -712,7 +724,7 @@
 
         // MyAnimeList login
         const malLogin = document.createElement("button");
-        malLogin.innerText = "MyAnimeList Login";
+        malLogin.textContent = "MyAnimeList Login";
         malLogin.classList.add("button");
         malLogin.style.width = "200px";
         content.appendChild(malLogin);
@@ -737,7 +749,7 @@
 
         // AniList login
         const aniListLogin = document.createElement("button");
-        aniListLogin.innerText = "AniList Login";
+        aniListLogin.textContent = "AniList Login";
         aniListLogin.classList.add("button");
         aniListLogin.style.width = "200px";
         content.appendChild(aniListLogin);
@@ -877,16 +889,18 @@
             header.style.marginBottom = note !== undefined ? "0.25em" : "1em";
             resultContainer.appendChild(header);
             if (note !== undefined) {
-                const n = createElement(
+                createElement(
                     "div",
-                    { style: "font-size: 14px; margin-bottom: 1em;" },
+                    {
+                        textContent: note,
+                        style: "font-size: 14px; margin-bottom: 1em;",
+                    },
                     resultContainer,
                 );
-                n.textContent = note;
             }
             const list = createElement(
                 "div",
-                { class: "resultList" },
+                { className: "resultList" },
                 resultContainer,
             );
             return { header, list };
@@ -895,9 +909,9 @@
         const resultCard = (picture, url, title, type, date, extra) => {
             type = type.replace("_", " ").toLowerCase();
             const card = createElement("div", {
-                class: "resultCard",
+                className: "resultCard",
             });
-            const thumb = createElement("div", { class: "thumb" }, card);
+            const thumb = createElement("div", { className: "thumb" }, card);
             const img = createElement(
                 "img",
                 {
@@ -909,18 +923,23 @@
             img.addEventListener("click", () => {
                 details.toggleAttribute("open");
             });
-            const summary = createElement("summary", {}, details);
-            summary.innerHTML = `${title} <a href="${url}" target="_blank">🔗</a>
-            <span style="text-transform: capitalize;">${type}</span> [${date}]`;
+            const summary = createElement(
+                "summary",
+                {
+                    innerHTML: `${title} <a href="${url}" target="_blank">🔗</a>
+                        <span style="text-transform: capitalize;">${type}</span> [${date}]`,
+                },
+                details,
+            );
             details.insertAdjacentHTML("beforeend", extra ?? "");
             const button = createElement(
                 "button",
                 {
-                    class: "button",
+                    textContent: "Set URL",
+                    className: "button",
                 },
                 card,
             );
-            button.textContent = "Set URL";
             return { card, button };
         };
 
@@ -1186,7 +1205,7 @@
         el = document.createElement(tagName);
         if (attributes !== undefined) {
             for (const [key, value] of Object.entries(attributes)) {
-                el.setAttributeNS(null, key, value);
+                el[key] = value;
             }
         }
         if (appendTo !== undefined) appendTo.appendChild(el);
