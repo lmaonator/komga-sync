@@ -66,8 +66,7 @@
 
     let buttonInserted = false;
 
-    let interval = setInterval(async () => {
-        // book/<id>/read?page=1&incognito=false
+    setInterval(async () => {
         const url = new URL(window.location.href);
 
         let match = url.pathname.match(/series\/([^/]+)/);
@@ -542,121 +541,138 @@
     const shadow = host.attachShadow({ mode: "open" });
     const shadowStyle = document.createElement("style");
     shadowStyle.textContent = `
-    .modal {
-        z-index: 300;
-        position: fixed;
-        padding-top: 100px;
-        transform: translate(0, 0);
-        left: 0;
-        top: 0;
-        bottom: 0;
-        right: 0;
-        width: auto;
-        height: auto;
-        overflow: auto;
-        background-color: rgba(0, 0, 0, 0.8);
-        overscroll-behavior: contain;
-    }
-    
-    .content {
-        font-family: Roboto, sans-serif;
-        font-size: 16px;
-        color: #ffffff;
-        background-color: #121212;
-        margin: auto;
-        width: 80%;
-        padding: 1em;
-        border: 1px solid #696969;
-        border-radius: 10px;
-    }
-    
-    .button {
-        background-color: #303030;
-        border: 2px solid #303030;
-        border-radius: 5px;
-        color: #ffffff;
-        padding: 6px 16px;
-        text-align: center;
-        text-decoration: none;
-        display: inline-block;
-        font-size: 16px;
-        margin: 2px;
-        transition-duration: 0.2s;
-        cursor: pointer;
-    }
-    
-    .button:hover {
-        background-color: #ffffff;
-        color: #000000;
-    }
-    
-    input[type=text],
-    input[type=url] {
-        padding: 5px;
-        margin: 2px;
-        box-sizing: border-box;
-        border: 1px solid #303030;
-        border-radius: 5px;
-        color: #ffffff;
-        background-color: #303030;
-        font-size: 16px;
-        width: 100%;
-        max-width: 800px;
-    }
+.modal {
+    z-index: 300;
+    position: fixed;
+    padding-top: 100px;
+    transform: translate(0, 0);
+    left: 0;
+    top: 0;
+    bottom: 0;
+    right: 0;
+    width: auto;
+    height: auto;
+    overflow: auto;
+    background-color: rgba(0, 0, 0, 0.8);
+    overscroll-behavior: contain;
+}
 
-    a {
-        text-decoration: none;
-        color: #ffffff;
-    }
+.content {
+    font-family: Roboto, sans-serif;
+    font-size: 16px;
+    color: #ffffff;
+    background-color: #121212;
+    margin: auto;
+    width: 80%;
+    padding: 1em;
+    border: 1px solid #696969;
+    border-radius: 10px;
+}
 
-    .resultList {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.5em;"
-    }
+h2 {
+    margin-top: 1em;
+    margin-bottom: 1em;
+}
 
-    .resultCard {
-        border: 1px solid #000;
-        background-color: #232323;
-        flex-basis: 400px;
-        flex-grow: 1;
-    }
+label {
+    display: inline-block;
+    width: 120px;
+}
 
-    .resultCard .thumb {
-        float: left;
-        margin-right: 4px;
-        width: 106px;
-    }
+button {
+    background-color: #303030;
+    border: 2px solid #303030;
+    border-radius: 5px;
+    color: #ffffff;
+    padding: 6px 16px;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 16px;
+    margin: 2px;
+    transition-duration: 0.2s;
+    cursor: pointer;
+}
 
-    .resultCard img {
-        display: block;
-        height: 150px;
-        width: 106px;
-        object-fit: contain; 
-    }
+button:hover {
+    background-color: #ffffff;
+    color: #000000;
+}
 
-    .resultCard details {
-        margin: 5px;
-    }
+.login-button {
+    width: 200px;
+}
 
-    .resultCard summary {
-        font-weight: bold;
-    }
+input[type=text],
+input[type=url] {
+    padding: 5px;
+    margin: 2px;
+    box-sizing: border-box;
+    border: 1px solid #303030;
+    border-radius: 5px;
+    color: #ffffff;
+    background-color: #303030;
+    font-size: 16px;
+    width: 100%;
+    max-width: 800px;
+}
 
-    .resultCard button {
-        margin: 0.5em;
-        padding: 3px 8px;
-        border: 1px solid #404040;
-        font-size: 14px;
-    }
+a {
+    text-decoration: none;
+    color: #ffffff;
+}
 
-    .resultCard ul {
-        margin-top: 0.25em;
-        padding-left: 10px;
-        list-style: inside;
-        overflow: auto;
-    }
-    `;
+.resultList {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5em;"
+}
+
+.resultCard {
+    border: 1px solid #000;
+    background-color: #232323;
+    flex-basis: 400px;
+    flex-grow: 1;
+}
+
+.resultCard .thumb {
+    float: left;
+    margin-right: 4px;
+    width: 106px;
+}
+
+.resultCard img {
+    display: block;
+    height: 150px;
+    width: 106px;
+    object-fit: contain;
+}
+
+.resultCard details {
+    margin: 5px;
+}
+
+.resultCard summary {
+    font-weight: bold;
+}
+
+.resultCard summary span {
+    text-transform: capitalize;
+}
+
+.resultCard button {
+    margin: 0.5em;
+    padding: 3px 8px;
+    border: 1px solid #404040;
+    font-size: 14px;
+}
+
+.resultCard ul {
+    margin-top: 0.25em;
+    padding-left: 10px;
+    list-style: inside;
+    overflow: auto;
+}`;
     shadow.appendChild(shadowStyle);
 
     async function createUI(seriesId) {
@@ -690,8 +706,7 @@
         // MangaUpdates login
         const muLogin = document.createElement("button");
         muLogin.textContent = "MangaUpdates Login";
-        muLogin.classList.add("button");
-        muLogin.style.width = "200px";
+        muLogin.className = "login-button";
         content.appendChild(muLogin);
         muLogin.addEventListener("click", async () => {
             const username = prompt("MangaUpdates username:");
@@ -725,8 +740,7 @@
         // MyAnimeList login
         const malLogin = document.createElement("button");
         malLogin.textContent = "MyAnimeList Login";
-        malLogin.classList.add("button");
-        malLogin.style.width = "200px";
+        malLogin.className = "login-button";
         content.appendChild(malLogin);
         malLogin.addEventListener("click", async () => {
             const state = randStr(16);
@@ -750,8 +764,7 @@
         // AniList login
         const aniListLogin = document.createElement("button");
         aniListLogin.textContent = "AniList Login";
-        aniListLogin.classList.add("button");
-        aniListLogin.style.width = "200px";
+        aniListLogin.className = "login-button";
         content.appendChild(aniListLogin);
         aniListLogin.addEventListener("click", () => {
             const params = new URLSearchParams({
@@ -771,7 +784,6 @@
 
         const title = document.createElement("h2");
         title.textContent = series.metadata.title ?? series.name;
-        title.style = "margin-top: 1em; margin-bottom: 1em;";
         content.appendChild(title);
 
         const urls = {
@@ -813,7 +825,6 @@
         function urlForm(name, url, root) {
             const label = document.createElement("label");
             label.textContent = name;
-            label.style = "display: inline-block; width: 120px;";
             root.appendChild(label);
             const urlInput = document.createElement("input");
             urlInput.type = "url";
@@ -821,7 +832,6 @@
             root.appendChild(urlInput);
             const button = document.createElement("button");
             button.textContent = "Search " + name;
-            button.classList.add("button");
             root.appendChild(document.createElement("br"));
             return [urlInput, button];
         }
@@ -838,7 +848,6 @@
 
         const searchLabel = document.createElement("label");
         searchLabel.textContent = "Search Term:";
-        searchLabel.style = "display: inline-block; width: 120px;";
         links.appendChild(searchLabel);
         const searchInput = document.createElement("input");
         searchInput.value = series.metadata.title ?? series.name;
@@ -908,17 +917,9 @@
 
         const resultCard = (picture, url, title, type, date, extra) => {
             type = type.replace("_", " ").toLowerCase();
-            const card = createElement("div", {
-                className: "resultCard",
-            });
+            const card = createElement("div", { className: "resultCard" });
             const thumb = createElement("div", { className: "thumb" }, card);
-            const img = createElement(
-                "img",
-                {
-                    src: picture,
-                },
-                thumb,
-            );
+            const img = createElement("img", { src: picture }, thumb);
             const details = createElement("details", {}, card);
             img.addEventListener("click", () => {
                 details.toggleAttribute("open");
@@ -927,17 +928,14 @@
                 "summary",
                 {
                     innerHTML: `${title} <a href="${url}" target="_blank">🔗</a>
-                        <span style="text-transform: capitalize;">${type}</span> [${date}]`,
+                        <span>${type}</span> [${date}]`,
                 },
                 details,
             );
             details.insertAdjacentHTML("beforeend", extra ?? "");
             const button = createElement(
                 "button",
-                {
-                    textContent: "Set URL",
-                    className: "button",
-                },
+                { textContent: "Set URL" },
                 card,
             );
             return { card, button };
