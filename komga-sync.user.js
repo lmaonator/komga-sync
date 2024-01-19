@@ -331,17 +331,47 @@
         chapterNum = Math.floor(chapterNum);
 
         let r = await malRequest(
-            "/manga/" + mangaId + "?fields=my_list_status",
+            "/manga/" + mangaId + "?fields=my_list_status,num_chapters,status",
             "GET",
         );
-        let data = JSON.parse(r.responseText);
-        if (data.my_list_status.num_chapters_read >= chapterNum) {
+        const data = JSON.parse(r.responseText);
+        const status = data.my_list_status ?? {
+            is_rereading: false,
+            num_chapters_read: 0,
+            status: "plan_to_read",
+        };
+
+        if (status.num_chapters_read >= chapterNum) {
             return true;
         }
 
-        r = await malRequest("/manga/" + mangaId + "/my_list_status", "PATCH", {
+        const update = {
             num_chapters_read: chapterNum,
-        });
+        };
+
+        const date = new Date().toISOString().substring(0, 10);
+
+        if (status.status === "plan_to_read") {
+            update.status = "reading";
+            if (status.start_date === undefined) {
+                update.start_date = date;
+            }
+        } else if (
+            status.status === "reading" &&
+            chapterNum >= data.num_chapters &&
+            data.status === "finished"
+        ) {
+            update.status = "completed";
+            if (status.finish_date === undefined) {
+                update.finish_date = date;
+            }
+        }
+
+        r = await malRequest(
+            "/manga/" + mangaId + "/my_list_status",
+            "PATCH",
+            update,
+        );
         if (r.status === 200) {
             return true;
         } else {
@@ -1126,6 +1156,7 @@
         if (match) {
             return parseInt(match[1], 10);
         }
+        throw new Error("Invalid URL");
     }
 
     function randStr(length) {
