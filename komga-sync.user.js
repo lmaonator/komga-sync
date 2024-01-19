@@ -225,22 +225,28 @@
             return false;
         }
 
+        const update = {
+            series: {
+                id: urlToId(url),
+            },
+            status: {
+                chapter: chapterNum,
+            },
+        };
+        let endpoint = "/lists/series";
+
         let r = await muRequest("/lists/series/" + urlToId(url), "GET");
-        const current = JSON.parse(r.responseText);
-        if (current.status.chapter >= chapterNum) {
-            return true;
+        if (r.status === 404) {
+            update.list_id = 0; // add to reading list
+        } else {
+            const current = JSON.parse(r.responseText);
+            if (current.status.chapter >= chapterNum) {
+                return true;
+            }
+            endpoint += "/update";
         }
 
-        r = await muRequest("/lists/series/update", "POST", [
-            {
-                series: {
-                    id: urlToId(url),
-                },
-                status: {
-                    chapter: chapterNum,
-                },
-            },
-        ]);
+        r = await muRequest(endpoint, "POST", [update]);
         if (r.status === 200) {
             return true;
         } else {
