@@ -9,8 +9,8 @@ series page titled `MangaUpdates`, `MyAnimeList` and `AniList`.
 If a link exists and you previously logged into the same site then the script will query your
 chapter progress and update it if it is higher.
 
-The script assumes that your chapter numbers in Komga are the same as the actual number of the
-chapter. This can be achieved by the use of `ComicInfo.xml` within `CBZ` archives or otherwise
+The script currently assumes that your chapter numbers in Komga are the same as the actual number
+of the chapter. This can be achieved by the use of `ComicInfo.xml` within `CBZ` archives or otherwise
 changing the metadata in Komga.
 
 ## Usage
@@ -18,11 +18,12 @@ changing the metadata in Komga.
 Install a userscript manager, I recommend the open-source
 [Violentmonkey](https://violentmonkey.github.io/) extension.
 
-Install the script by navigating to: <https://github.com/lmaonator/komga-sync/raw/main/komga-sync.user.js>
+Install the script by navigating to: <https://lmaonator.github.io/komga-sync/komga-sync.user.js>
 
-Set the URL for your custom Komga instance if the default @match rules don't already work:
+Set the URL for your custom Komga instance if the default @match rules don't already work.
+The following steps avoid editing the script source and persist after updates:
 
-- In Violentmonkey, click `</>` next to `komga-sync` to edit the script.
+- In Violentmonkey, click `</>` next to `komga-sync` to open the script editor.
 - At the top click on the `Settings` tab.
 - On the right side add your URL under `@match rules`, for example: `https://example.com/manga/*`
 
