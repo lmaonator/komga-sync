@@ -565,6 +565,59 @@
         width: 100%;
         max-width: 800px;
     }
+
+    a {
+        text-decoration: none;
+        color: #ffffff;
+    }
+
+    .resultList {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5em;"
+    }
+
+    .resultCard {
+        border: 1px solid #000;
+        background-color: #232323;
+        flex-basis: 400px;
+        flex-grow: 1;
+    }
+
+    .resultCard .thumb {
+        float: left;
+        margin-right: 4px;
+        width: 106px;
+    }
+
+    .resultCard img {
+        display: block;
+        height: 150px;
+        width: 106px;
+        object-fit: contain; 
+    }
+
+    .resultCard details {
+        margin: 5px;
+    }
+
+    .resultCard summary {
+        font-weight: bold;
+    }
+
+    .resultCard button {
+        margin: 0.5em;
+        padding: 3px 8px;
+        border: 1px solid #404040;
+        font-size: 14px;
+    }
+
+    .resultCard ul {
+        margin-top: 0.25em;
+        padding-left: 10px;
+        list-style: inside;
+        overflow: auto;
+    }
     `;
     shadow.appendChild(shadowStyle);
 
@@ -780,34 +833,58 @@
         const resultContainer = document.createElement("div");
         content.appendChild(resultContainer);
 
-        const prepareResult = (name) => {
+        const prepareResult = (name, note) => {
             resultContainer.innerHTML = "";
             const header = document.createElement("h3");
             header.textContent = name + " Results";
-            header.style = "margin-bottom: 1em; margin-top: 1em";
+            header.style = "margin-top: 1em";
+            header.style.marginBottom = note !== undefined ? "0.25em" : "1em";
             resultContainer.appendChild(header);
-            const list = document.createElement("div");
-            list.style =
-                "display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.5em";
-            resultContainer.appendChild(list);
+            if (note !== undefined) {
+                const n = createElement(
+                    "div",
+                    { style: "font-size: 14px; margin-bottom: 1em;" },
+                    resultContainer,
+                );
+                n.textContent = note;
+            }
+            const list = createElement(
+                "div",
+                { class: "resultList" },
+                resultContainer,
+            );
             return { header, list };
         };
 
         const resultCard = (picture, url, title, type, date, extra) => {
-            const card = document.createElement("div");
-            card.style = "border: 1px solid #000; background-color: #363636";
-            card.innerHTML = `
-                <img src="${picture}" height="150" style="float: left;">
-                <div style="display: inline-block; padding: 5px;">
-                    <a href="${url}" target="_blank" style="color: #fff; font-weight: bold;">${title}</a><br>
-                    ${type} [${date}]<br>
-                    ${extra ?? ""}
-                </div><br>
-            `;
-            const button = document.createElement("button");
+            type = type.replace("_", " ").toLowerCase();
+            const card = createElement("div", {
+                class: "resultCard",
+            });
+            const thumb = createElement("div", { class: "thumb" }, card);
+            const img = createElement(
+                "img",
+                {
+                    src: picture,
+                },
+                thumb,
+            );
+            const details = createElement("details", {}, card);
+            img.addEventListener("click", () => {
+                details.toggleAttribute("open");
+            });
+            const summary = createElement("summary", {}, details);
+            summary.innerHTML = `${title} <a href="${url}" target="_blank">🔗</a>
+            <span style="text-transform: capitalize;">${type}</span> [${date}]`;
+            details.insertAdjacentHTML("beforeend", extra ?? "");
+            const button = createElement(
+                "button",
+                {
+                    class: "button",
+                },
+                card,
+            );
             button.textContent = "Set URL";
-            button.style = "all: revert; margin: 5px; margin-top: 1em;";
-            card.appendChild(button);
             return { card, button };
         };
 
@@ -844,7 +921,10 @@
         malButton.addEventListener("click", async () => {
             const url = new URL(MAL_API + "/manga");
             url.searchParams.set("q", searchInput.value);
-            url.searchParams.set("fields", "start_date, media_type");
+            url.searchParams.set(
+                "fields",
+                "start_date, media_type, alternative_titles",
+            );
             url.searchParams.set("nsfw", "true");
             GM.xmlHttpRequest({
                 url: url.toString(),
@@ -854,16 +934,30 @@
                 },
                 onload: (r) => {
                     const data = JSON.parse(r.responseText);
-                    const { header, list } = prepareResult("MyAnimeList");
+                    const { header, list } = prepareResult(
+                        "MyAnimeList",
+                        "Click on the series thumbnail or title to show synonyms.",
+                    );
                     for (const { node } of data.data) {
                         const mangaUrl =
                             "https://myanimelist.net/manga/" + node.id;
+                        const titles = node.alternative_titles;
                         const { card, button } = resultCard(
                             node.main_picture.medium,
                             mangaUrl,
                             node.title,
                             node.media_type,
-                            node.start_date,
+                            node.start_date.slice(0, 4),
+                            (titles.en !== "" ? titles.en + "<br>" : "") +
+                                titles.ja +
+                                (titles.synonyms.length > 0
+                                    ? "<br><b>Synonyms:</b><ul>" +
+                                      titles.synonyms.reduce(
+                                          (acc, cur) => acc + `<li>${cur}</li>`,
+                                          "",
+                                      ) +
+                                      "</ul>"
+                                    : ""),
                         );
                         button.addEventListener("click", async () => {
                             malUrlInput.value = mangaUrl;
@@ -890,7 +984,6 @@
                                 native
                             }
                             format
-                            status
                             startDate {
                                 year
                             }
@@ -917,16 +1010,27 @@
                 data: JSON.stringify(data),
                 onload: (r) => {
                     const data = JSON.parse(r.responseText);
-                    const { header, list } = prepareResult("AniList");
+                    const { header, list } = prepareResult(
+                        "AniList",
+                        "Click on the series thumbnail or title to show synonyms.",
+                    );
                     for (const m of data.data.Page.media) {
                         const { card, button } = resultCard(
                             m.coverImage.medium,
                             m.siteUrl,
                             m.title.english ?? m.title.romaji ?? m.title.native,
-                            m.format + " " + m.status,
+                            m.format,
                             m.startDate.year,
-                            "Synonyms:<br>" +
-                                m.synonyms.slice(0, 3).join("<br>"),
+                            (m.title.romaji ? m.title.romaji + "<br>" : "") +
+                                m.title.native +
+                                (m.synonyms.length > 0
+                                    ? "<br><b>Synonyms:</b><ul>" +
+                                      m.synonyms.reduce(
+                                          (acc, cur) => acc + `<li>${cur}</li>`,
+                                          "",
+                                      ) +
+                                      "</ul>"
+                                    : ""),
                         );
                         button.addEventListener("click", async () => {
                             await komgaSetLink("AniList", m.siteUrl);
@@ -1032,5 +1136,23 @@
             result += chars[Math.floor(Math.random() * chars.length)];
         }
         return result;
+    }
+
+    /**
+     * Creates a new element with optional attributes and optionally append to a parent
+     * @param {String} tagName tag name, eg. div
+     * @param {Object} attributes object with attributes, eg. { id: 'my-element' }
+     * @param {Element} appendTo parent to which the new element should be appended to
+     * @returns {Element} the created element
+     */
+    function createElement(tagName, attributes, appendTo) {
+        el = document.createElement(tagName);
+        if (attributes !== undefined) {
+            for (const [key, value] of Object.entries(attributes)) {
+                el.setAttributeNS(null, key, value);
+            }
+        }
+        if (appendTo !== undefined) appendTo.appendChild(el);
+        return el;
     }
 })();
