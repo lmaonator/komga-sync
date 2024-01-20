@@ -1,4 +1,5 @@
 theme: jekyll-theme-cayman
 include:
+  - komga-sync.user.js
   - auth-mal.html
   - auth-anilist.html
