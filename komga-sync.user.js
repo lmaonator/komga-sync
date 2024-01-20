@@ -703,6 +703,12 @@ a {
 }`;
     shadow.appendChild(shadowStyle);
 
+    const resultCache = {
+        MangaUpdates: {},
+        MyAnimeList: {},
+        AniList: {},
+    };
+
     async function createUI(seriesId) {
         // Create Modal Dialog
         const modal = document.createElement("div");
@@ -922,10 +928,16 @@ a {
             }
         };
 
-        const resultContainer = createElement("div", {}, content);
+        const prepareAndCacheResult = (name, searchTerm, note) => {
+            const resultContainer = createElement(
+                "div",
+                { className: "result-container" },
+                content,
+            );
+            // cache for 5 minutes
+            resultCache[name][searchTerm] = resultContainer;
+            setTimeout(() => delete resultCache[name][searchTerm], 300_000);
 
-        const prepareResult = (name, note) => {
-            resultContainer.innerHTML = "";
             const header = document.createElement("h3");
             header.textContent = name + " Results";
             header.classList.add("result-header");
@@ -978,16 +990,25 @@ a {
         };
 
         muButton.addEventListener("click", async () => {
+            const searchTerm = searchInput.value.trim();
+            shadow.querySelector(".result-container")?.remove();
+            if (resultCache.MangaUpdates[searchTerm]) {
+                content.appendChild(resultCache.MangaUpdates[searchTerm]);
+                return;
+            }
             GM.xmlHttpRequest({
                 url: MU_API + "/series/search",
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 data: JSON.stringify({
-                    search: searchInput.value,
+                    search: searchTerm,
                 }),
                 onload: (response) => {
                     const data = JSON.parse(response.responseText);
-                    const list = prepareResult("MangaUpdates");
+                    const list = prepareAndCacheResult(
+                        "MangaUpdates",
+                        searchTerm,
+                    );
                     for (const { record } of data.results) {
                         const { card, button } = resultCard(
                             record.image.url.thumb,
@@ -1008,8 +1029,14 @@ a {
         });
 
         malButton.addEventListener("click", async () => {
+            const searchTerm = searchInput.value.trim();
+            shadow.querySelector(".result-container")?.remove();
+            if (resultCache.MyAnimeList[searchTerm]) {
+                content.appendChild(resultCache.MyAnimeList[searchTerm]);
+                return;
+            }
             const url = new URL(MAL_API + "/manga");
-            url.searchParams.set("q", searchInput.value);
+            url.searchParams.set("q", searchTerm);
             url.searchParams.set(
                 "fields",
                 "start_date, media_type, alternative_titles",
@@ -1023,8 +1050,9 @@ a {
                 },
                 onload: (r) => {
                     const data = JSON.parse(r.responseText);
-                    const list = prepareResult(
+                    const list = prepareAndCacheResult(
                         "MyAnimeList",
+                        searchTerm,
                         "Click on the series thumbnail or title to show synonyms.",
                     );
                     for (const { node } of data.data) {
@@ -1060,6 +1088,12 @@ a {
         });
 
         alButton.addEventListener("click", async () => {
+            shadow.querySelector(".result-container")?.remove();
+            const searchTerm = searchInput.value.trim();
+            if (resultCache.AniList[searchTerm]) {
+                content.appendChild(resultCache.AniList[searchTerm]);
+                return;
+            }
             const data = {
                 query: `
                     query ($search: String) {
@@ -1086,7 +1120,7 @@ a {
                     }
                 `,
                 variables: {
-                    search: searchInput.value,
+                    search: searchTerm,
                 },
             };
             GM.xmlHttpRequest({
@@ -1099,8 +1133,9 @@ a {
                 data: JSON.stringify(data),
                 onload: (r) => {
                     const data = JSON.parse(r.responseText);
-                    const list = prepareResult(
+                    const list = prepareAndCacheResult(
                         "AniList",
+                        searchTerm,
                         "Click on the series thumbnail or title to show synonyms.",
                     );
                     for (const m of data.data.Page.media) {
