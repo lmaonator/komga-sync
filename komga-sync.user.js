@@ -35,6 +35,8 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 //
 
+"use strict";
+
 (async () => {
     const prefix = "[komga-sync] ";
     const MU_API = "https://api.mangaupdates.com/v1";
@@ -703,7 +705,7 @@ a {
 
     async function createUI(seriesId) {
         // Create Modal Dialog
-        modal = document.createElement("div");
+        const modal = document.createElement("div");
         modal.classList.add("modal");
 
         const content = document.createElement("div");
@@ -780,7 +782,7 @@ a {
                 code_challenge,
                 code_challenge_method: "plain",
             });
-            GM.openInTab(AL_OAUTH + "/authorize?" + params.toString());
+            GM.openInTab(MAL_OAUTH + "/authorize?" + params.toString());
         });
         if ((await GM.getValue("mal_access_token", "")) !== "") {
             content.appendChild(document.createTextNode(" Logged in ✅"));
@@ -946,7 +948,7 @@ a {
                 { className: "result-list" },
                 resultContainer,
             );
-            return { header, list };
+            return list;
         };
 
         const resultCard = (picture, url, title, type, date, extra) => {
@@ -958,7 +960,7 @@ a {
             img.addEventListener("click", () => {
                 details.toggleAttribute("open");
             });
-            const summary = createElement(
+            createElement(
                 "summary",
                 {
                     innerHTML: `${title} <a href="${url}" target="_blank">🔗</a>
@@ -985,7 +987,7 @@ a {
                 }),
                 onload: (response) => {
                     const data = JSON.parse(response.responseText);
-                    const { header, list } = prepareResult("MangaUpdates");
+                    const list = prepareResult("MangaUpdates");
                     for (const { record } of data.results) {
                         const { card, button } = resultCard(
                             record.image.url.thumb,
@@ -1021,7 +1023,7 @@ a {
                 },
                 onload: (r) => {
                     const data = JSON.parse(r.responseText);
-                    const { header, list } = prepareResult(
+                    const list = prepareResult(
                         "MyAnimeList",
                         "Click on the series thumbnail or title to show synonyms.",
                     );
@@ -1097,7 +1099,7 @@ a {
                 data: JSON.stringify(data),
                 onload: (r) => {
                     const data = JSON.parse(r.responseText);
-                    const { header, list } = prepareResult(
+                    const list = prepareResult(
                         "AniList",
                         "Click on the series thumbnail or title to show synonyms.",
                     );
@@ -1234,7 +1236,7 @@ a {
      * @returns {Element} the created element
      */
     function createElement(tagName, attributes, appendTo) {
-        el = document.createElement(tagName);
+        const el = document.createElement(tagName);
         if (attributes !== undefined) {
             for (const [key, value] of Object.entries(attributes)) {
                 el[key] = value;
