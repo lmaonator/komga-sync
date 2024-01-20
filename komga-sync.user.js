@@ -603,8 +603,7 @@ button:hover {
     width: 200px;
 }
 
-input[type=text],
-input[type=url] {
+input {
     padding: 5px;
     margin: 2px;
     box-sizing: border-box;
@@ -617,57 +616,84 @@ input[type=url] {
     max-width: 800px;
 }
 
+.search-input {
+    margin-top: 16px;
+}
+
+.button-container {
+    margin-top: 8px;
+}
+
+.button-note {
+    font-size: 14px;
+    margin: 5px 2px;
+}
+
 a {
     text-decoration: none;
     color: #ffffff;
 }
 
-.resultList {
+.result-note {
+    font-size: 14px;
+    margin-bottom: 1em;
+}
+
+.result-header {
+    margin-top: 1em;
+    margin-bottom: 1em;
+}
+
+.result-header-with-note {
+    margin-bottom: 0.25em;
+}
+
+.result-list {
     display: flex;
     flex-wrap: wrap;
     gap: 0.5em;"
 }
 
-.resultCard {
+.result-card {
     border: 1px solid #000;
     background-color: #232323;
     flex-basis: 400px;
     flex-grow: 1;
 }
 
-.resultCard .thumb {
+.result-card .thumb {
     float: left;
     margin-right: 4px;
     width: 106px;
 }
 
-.resultCard img {
+.result-card img {
     display: block;
     height: 150px;
     width: 106px;
     object-fit: contain;
 }
 
-.resultCard details {
+.result-card details {
     margin: 5px;
 }
 
-.resultCard summary {
+.result-card summary {
     font-weight: bold;
 }
 
-.resultCard summary span {
+.result-card summary span {
     text-transform: capitalize;
 }
 
-.resultCard button {
+.result-card button {
     margin: 0.5em;
     padding: 3px 8px;
     border: 1px solid #404040;
     font-size: 14px;
 }
 
-.resultCard ul {
+.result-card ul {
     margin-top: 0.25em;
     padding-left: 10px;
     list-style: inside;
@@ -846,28 +872,35 @@ a {
         );
         const [alUrlInput, alButton] = urlForm("AniList", urls.al, links);
 
-        const searchLabel = document.createElement("label");
-        searchLabel.textContent = "Search Term:";
-        links.appendChild(searchLabel);
-        const searchInput = document.createElement("input");
-        searchInput.value = series.metadata.title ?? series.name;
-        searchInput.type = "text";
-        searchInput.size = "80";
-        searchInput.style = "margin-top: 16px;";
-        links.appendChild(searchInput);
+        createElement("label", { textContent: "Search Term:" }, links);
+        const searchInput = createElement(
+            "input",
+            {
+                value: series.metadata.title ?? series.name,
+                type: "text",
+                className: "search-input",
+            },
+            links,
+        );
 
-        const buttonContainer = document.createElement("div");
-        buttonContainer.style = "margin-top: 8px;";
+        const buttonContainer = createElement(
+            "div",
+            { className: "button-container" },
+            links,
+        );
         buttonContainer.appendChild(muButton);
         buttonContainer.appendChild(malButton);
         buttonContainer.appendChild(alButton);
-        links.appendChild(buttonContainer);
-        const note = document.createElement("div");
-        note.style = "font-size: 14px; margin: 5px 2px;";
-        note.textContent =
-            " Note: AniList has MyAnimeList IDs for most entries, if MAL is still " +
-            "missing it will also be added if available.";
-        links.appendChild(note);
+        createElement(
+            "div",
+            {
+                className: "button-note",
+                textContent:
+                    " Note: AniList has MyAnimeList IDs for most entries, if " +
+                    "MAL is still missing it will also be added if available.",
+            },
+            links,
+        );
         content.appendChild(links);
 
         const komgaSetLink = async (label, url) => {
@@ -887,29 +920,30 @@ a {
             }
         };
 
-        const resultContainer = document.createElement("div");
-        content.appendChild(resultContainer);
+        const resultContainer = createElement("div", {}, content);
 
         const prepareResult = (name, note) => {
             resultContainer.innerHTML = "";
             const header = document.createElement("h3");
             header.textContent = name + " Results";
-            header.style = "margin-top: 1em";
-            header.style.marginBottom = note !== undefined ? "0.25em" : "1em";
+            header.classList.add("result-header");
+            if (note !== undefined) {
+                header.classList.add("result-header-with-note");
+            }
             resultContainer.appendChild(header);
             if (note !== undefined) {
                 createElement(
                     "div",
                     {
                         textContent: note,
-                        style: "font-size: 14px; margin-bottom: 1em;",
+                        className: "result-note",
                     },
                     resultContainer,
                 );
             }
             const list = createElement(
                 "div",
-                { className: "resultList" },
+                { className: "result-list" },
                 resultContainer,
             );
             return { header, list };
@@ -917,7 +951,7 @@ a {
 
         const resultCard = (picture, url, title, type, date, extra) => {
             type = type.replace("_", " ").toLowerCase();
-            const card = createElement("div", { className: "resultCard" });
+            const card = createElement("div", { className: "result-card" });
             const thumb = createElement("div", { className: "thumb" }, card);
             const img = createElement("img", { src: picture }, thumb);
             const details = createElement("details", {}, card);
