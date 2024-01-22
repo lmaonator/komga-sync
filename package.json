@@ -1,0 +1,19 @@
+{
+  "name": "komga-sync",
+  "version": "1.0.0",
+  "description": "Sync manga chapter progress with tracking websites.",
+  "author": "lmaonator",
+  "license": "GPL-3.0-or-later",
+  "repository": "https://github.com/lmaonator/komga-sync",
+  "homepage": "https://lmaonator.github.io/komga-sync/",
+  "private": true,
+  "scripts": {
+    "build": "rollup --config",
+    "dev": "rollup --config --sourcemap=inline --watch"
+  },
+  "devDependencies": {
+    "@rollup/plugin-terser": "^0.4.4",
+    "eslint": "^8.56.0",
+    "rollup": "^4.9.6"
+  }
+}
