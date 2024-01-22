@@ -9,11 +9,17 @@
   "private": true,
   "scripts": {
     "build": "rollup --config",
-    "dev": "rollup --config --sourcemap=inline --watch"
+    "dev": "rollup --config --sourcemap=inline --watch",
+    "lint": "eslint rollup.config.mjs rollup-plugin-add-header.mjs src",
+    "format:base": "prettier rollup.config.mjs rollup-plugin-add-header.mjs src",
+    "format:check": "npm run format:base -- --check",
+    "format": "npm run format:base -- --write"
   },
   "devDependencies": {
     "@rollup/plugin-terser": "^0.4.4",
     "eslint": "^8.56.0",
+    "eslint-config-prettier": "^9.1.0",
+    "prettier": "^3.2.4",
     "rollup": "^4.9.6"
   }
 }
