@@ -6,7 +6,7 @@ import header from "./src/header.mjs";
  */
 export default function postprocess() {
     return {
-        name: "add-header",
+        name: "postprocess",
         writeBundle(options) {
             let code = readFileSync(options.file, { encoding: "utf-8" });
 
