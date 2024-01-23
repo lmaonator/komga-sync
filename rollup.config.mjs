@@ -26,7 +26,11 @@ export default {
         {
             file: "dist/komga-sync.min.user.js",
             format: "iife",
-            plugins: [terser(), postprocess()],
+            plugins: [
+                postprocess({ addHeader: false }),
+                terser(),
+                postprocess({ importCss: false }),
+            ],
         },
     ],
     plugins: [addWatchFiles(["src/header.mjs", "src/*.css"])],
