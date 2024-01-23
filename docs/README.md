@@ -9,9 +9,13 @@ series page titled `MangaUpdates`, `MyAnimeList` and `AniList`.
 If a link exists and you previously logged into the same site then the script will query your
 chapter progress and update it if it is higher.
 
-The script currently assumes that your chapter numbers in Komga are the same as the actual number
-of the chapter. This can be achieved by the use of `ComicInfo.xml` within `CBZ` archives or otherwise
-changing the metadata in Komga.
+The script by default uses chapter numbers from Komga which is probably only useful if your
+`CBZ` archives contain `ComicInfo.xml` files with correct chapter number or you use other tools
+to bulk set metadata.  
+It can also parse filenames for chapter numbers, however the parser tends to have issues if the
+filename contains unrelated numbers or dates.  
+This can be configured globally and overriden per series. When "Parse Filename" is selected then
+the parsed chapter number will be displayed below the file field on book pages.
 
 ## Usage
 

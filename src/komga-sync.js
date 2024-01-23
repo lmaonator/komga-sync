@@ -1,3 +1,12 @@
+import addChapterParsePreview from "./add-chapter-parse-preview.mjs";
+import chapterRecognition from "./chapter-recognition.mjs";
+import {
+    createGlobalConfigDOM,
+    createSeriesConfigDOM,
+    loadConfig,
+    parseFileForChapterNumber,
+} from "./config.mjs";
+
 (async () => {
     const prefix = "[komga-sync] ";
     const MU_API = "https://api.mangaupdates.com/v1";
@@ -16,6 +25,8 @@
 
     if (!document.title.startsWith("Komga")) return;
 
+    const config = await loadConfig();
+
     const chapter = {
         id: "",
         title: "",
@@ -28,6 +39,7 @@
     };
 
     let buttonInserted = false;
+    let chapterParsePreviewInserted = false;
 
     setInterval(async () => {
         const url = new URL(window.location.href);
@@ -70,7 +82,14 @@
                 let r = await fetch("/api/v1/books/" + chapter.id);
                 let data = await r.json();
                 chapter.title = data.metadata.title;
-                chapter.number = data.metadata.number;
+                if (parseFileForChapterNumber(config, chapter.seriesId)) {
+                    chapter.number = chapterRecognition.parseChapterNumber(
+                        data.seriesTitle,
+                        data.url,
+                    );
+                } else {
+                    chapter.number = data.metadata.number;
+                }
                 chapter.pagesCount = data.media.pagesCount;
                 chapter.seriesId = data.seriesId;
                 chapter.seriesTitle = data.seriesTitle;
@@ -79,7 +98,7 @@
                     prefix +
                         "Chapter opened: " +
                         chapter.seriesTitle +
-                        " " +
+                        " Ch. " +
                         chapter.number +
                         ": " +
                         chapter.title,
@@ -129,6 +148,24 @@
         } else if (chapter.id !== "") {
             console.log(prefix + "Chapter closed");
             chapter.id = "";
+        }
+
+        // preview parsed chapter number if enabled
+        match = url.pathname.match(/book\/([^/]+)\/?$/);
+        if (match !== null) {
+            const seriesId = document
+                .querySelector("a.link-underline.text-h5")
+                .href.match(/series\/([^/]+)/)[1];
+            if (
+                !chapterParsePreviewInserted &&
+                parseFileForChapterNumber(config, seriesId)
+            ) {
+                chapterParsePreviewInserted = addChapterParsePreview();
+            } else {
+                chapterParsePreviewInserted = true;
+            }
+        } else {
+            chapterParsePreviewInserted = false;
         }
     }, 500);
 
@@ -521,30 +558,60 @@
         content.classList.add("content");
         modal.appendChild(content);
 
+        // Add Header
+        const header = document.createElement("div");
+        header.classList.add("header");
+        content.appendChild(header);
+
+        const headerTitle = document.createElement("div");
+        headerTitle.classList.add("header-title");
+        headerTitle.textContent = "Komga-Sync";
+        header.appendChild(headerTitle);
+
+        const headerControls = document.createElement("div");
+        header.appendChild(headerControls);
+
+        const headerClose = document.createElement("button");
+        headerClose.textContent = "❌";
+        headerControls.appendChild(headerClose);
+
+        function removeWithListeners() {
+            modal.remove();
+            shadow.removeEventListener("click", closeModalClick);
+            window.removeEventListener("keydown", closeModalKey);
+        }
+
         function closeModalClick(e) {
             if (e.target == modal) {
-                modal.remove();
-                shadow.removeEventListener("click", closeModalClick);
-                window.removeEventListener("keydown", closeModalKey);
+                removeWithListeners();
             }
         }
 
         function closeModalKey(e) {
             if (e.code === "Escape") {
-                modal.remove();
-                shadow.removeEventListener("click", closeModalClick);
-                window.removeEventListener("keydown", closeModalKey);
+                removeWithListeners();
             }
         }
 
+        headerClose.addEventListener("click", removeWithListeners);
         shadow.addEventListener("click", closeModalClick);
         window.addEventListener("keydown", closeModalKey);
+
+        const confDiv = document.createElement("div");
+        confDiv.classList.add("global-conf");
+        content.appendChild(confDiv);
+
+        const accounts = document.createElement("div");
+        confDiv.appendChild(accounts);
+
+        const globalConf = createGlobalConfigDOM(config);
+        confDiv.appendChild(globalConf);
 
         // MangaUpdates login
         const muLogin = document.createElement("button");
         muLogin.textContent = "MangaUpdates Login";
         muLogin.className = "login-button";
-        content.appendChild(muLogin);
+        accounts.appendChild(muLogin);
         muLogin.addEventListener("click", async () => {
             const username = prompt("MangaUpdates username:");
             const password = prompt("MangaUpdates password:");
@@ -570,15 +637,15 @@
             });
         });
         if ((await GM.getValue("mu_session_token", "")) !== "") {
-            content.appendChild(document.createTextNode(" Logged in ✅"));
+            accounts.appendChild(document.createTextNode(" Logged in ✅"));
         }
-        content.appendChild(document.createElement("br"));
+        accounts.appendChild(document.createElement("br"));
 
         // MyAnimeList login
         const malLogin = document.createElement("button");
         malLogin.textContent = "MyAnimeList Login";
         malLogin.className = "login-button";
-        content.appendChild(malLogin);
+        accounts.appendChild(malLogin);
         malLogin.addEventListener("click", async () => {
             const state = randStr(16);
             const code_challenge = randStr(64);
@@ -594,15 +661,15 @@
             GM.openInTab(MAL_OAUTH + "/authorize?" + params.toString());
         });
         if ((await GM.getValue("mal_access_token", "")) !== "") {
-            content.appendChild(document.createTextNode(" Logged in ✅"));
+            accounts.appendChild(document.createTextNode(" Logged in ✅"));
         }
-        content.appendChild(document.createElement("br"));
+        accounts.appendChild(document.createElement("br"));
 
         // AniList login
         const aniListLogin = document.createElement("button");
         aniListLogin.textContent = "AniList Login";
         aniListLogin.className = "login-button";
-        content.appendChild(aniListLogin);
+        accounts.appendChild(aniListLogin);
         aniListLogin.addEventListener("click", () => {
             const params = new URLSearchParams({
                 client_id: atob(DICLA),
@@ -611,9 +678,8 @@
             GM.openInTab(ANILIST_OAUTH + "/authorize?" + params.toString());
         });
         if ((await GM.getValue("anilist_access_token", "")) !== "") {
-            content.appendChild(document.createTextNode(" Logged in ✅"));
+            accounts.appendChild(document.createTextNode(" Logged in ✅"));
         }
-        content.appendChild(document.createElement("br"));
 
         // get series metadata
         const r = await fetch("/api/v1/series/" + seriesId);
@@ -622,6 +688,10 @@
         const title = document.createElement("h2");
         title.textContent = series.metadata.title ?? series.name;
         content.appendChild(title);
+
+        const seriesConf = createSeriesConfigDOM(config, seriesId);
+        seriesConf.classList.add("series-conf");
+        content.appendChild(seriesConf);
 
         const urls = {
             mu: "",
@@ -674,6 +744,7 @@
         }
 
         const links = document.createElement("div");
+        links.classList.add("links");
 
         const [muUrlInput, muButton] = urlForm("MangaUpdates", urls.mu, links);
         const [malUrlInput, malButton] = urlForm(
