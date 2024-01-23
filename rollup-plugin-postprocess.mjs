@@ -12,10 +12,12 @@ export default function postprocess() {
 
             // Replace `<import file.css>` with contents of file.css
             code = code.replaceAll(
-                /`<import ([^>]+\.css)>`/g,
+                /[`"']<import ([^>]+\.css)>[`"']/g,
                 (match, filename) =>
                     "`" +
-                    readFileSync("./src/" + filename, { encoding: "utf-8" }) +
+                    readFileSync("./src/" + filename, {
+                        encoding: "utf-8",
+                    }).replaceAll(/([`$])/gm, "\\$1") +
                     "`",
             );
 
