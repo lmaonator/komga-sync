@@ -22,7 +22,11 @@ the parsed chapter number will be displayed below the file field on book pages.
 Install a userscript manager, I recommend the open-source
 [Violentmonkey](https://violentmonkey.github.io/) extension.
 
-Install the script by navigating to: <https://lmaonator.github.io/komga-sync/komga-sync.user.js>
+Install the minified script from:
+<https://lmaonator.github.io/komga-sync/komga-sync.min.user.js>
+
+If you want to see what's going on or modify it then get the normal bundle:
+<https://lmaonator.github.io/komga-sync/komga-sync.user.js>
 
 Set the URL for your custom Komga instance if the default @match rules don't already work.
 The following steps avoid editing the script source and persist after updates:
