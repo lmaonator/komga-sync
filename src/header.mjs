@@ -1,3 +1,4 @@
+// used by rollup-plugin-postprocess.mjs
 export default function (pkg) {
     return `// ==UserScript==
 // @name        ${pkg.name}

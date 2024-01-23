@@ -1,5 +1,5 @@
 import terser from "@rollup/plugin-terser";
-import addHeader from "./rollup-plugin-add-header.mjs";
+import postprocess from "./rollup-plugin-postprocess.mjs";
 
 export default {
     input: "src/komga-sync.js",
@@ -7,12 +7,12 @@ export default {
         {
             file: "dist/komga-sync.user.js",
             format: "iife",
-            plugins: [addHeader()],
+            plugins: [postprocess()],
         },
         {
             file: "dist/komga-sync.min.user.js",
             format: "iife",
-            plugins: [terser(), addHeader()],
+            plugins: [terser(), postprocess()],
         },
     ],
     plugins: [],
