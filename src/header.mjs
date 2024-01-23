@@ -1,5 +1,5 @@
 // used by rollup-plugin-postprocess.mjs
-export default function (pkg) {
+export default function (pkg, filename) {
     return `// ==UserScript==
 // @name        ${pkg.name}
 // @version     ${pkg.version}
@@ -7,7 +7,7 @@ export default function (pkg) {
 // @description ${pkg.description}
 // @license     ${pkg.license}
 // @homepageURL ${pkg.homepage}
-// @downloadURL ${pkg.homepage}komga-sync.user.js
+// @downloadURL ${pkg.homepage}${filename}
 // @supportURL  ${pkg.repository}/issues
 // @namespace   ${pkg.repository}
 // @match       http*://komga.*/*

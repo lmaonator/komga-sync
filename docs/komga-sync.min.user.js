@@ -5,7 +5,7 @@
 // @description Sync manga chapter progress with tracking websites.
 // @license     GPL-3.0-or-later
 // @homepageURL https://lmaonator.github.io/komga-sync/
-// @downloadURL https://lmaonator.github.io/komga-sync/komga-sync.user.js
+// @downloadURL https://lmaonator.github.io/komga-sync/komga-sync.min.user.js
 // @supportURL  https://github.com/lmaonator/komga-sync/issues
 // @namespace   https://github.com/lmaonator/komga-sync
 // @match       http*://komga.*/*

@@ -1,5 +1,6 @@
 import MagicString from "magic-string";
 import { readFileSync } from "node:fs";
+import path from "node:path";
 import header from "./src/header.mjs";
 
 /**
@@ -32,7 +33,9 @@ export default function postprocess({
                 const pkg = JSON.parse(
                     readFileSync("./package.json", { encoding: "utf-8" }),
                 );
-                magicString.prepend(header(pkg));
+                magicString.prepend(
+                    header(pkg, path.basename(outputOptions.file)),
+                );
             }
 
             const result = { code: magicString.toString() };
