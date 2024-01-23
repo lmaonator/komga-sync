@@ -9,7 +9,7 @@
   "private": true,
   "scripts": {
     "build": "rollup --config",
-    "dev": "rollup --config --sourcemap=inline --watch",
+    "dev": "rollup --config --watch",
     "lint": "eslint rollup.config.mjs rollup-plugin-postprocess.mjs src",
     "format:base": "prettier rollup.config.mjs rollup-plugin-postprocess.mjs src",
     "format:check": "npm run format:base -- --check",
