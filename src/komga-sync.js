@@ -613,27 +613,76 @@ import {
         muLogin.className = "login-button";
         accounts.appendChild(muLogin);
         muLogin.addEventListener("click", async () => {
-            const username = prompt("MangaUpdates username:");
-            const password = prompt("MangaUpdates password:");
-            GM.xmlHttpRequest({
-                url: MU_API + "/account/login",
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                data: JSON.stringify({
-                    username,
-                    password,
-                }),
-                onload: async (response) => {
-                    const data = JSON.parse(response.responseText);
-                    if (data.status === "success") {
-                        await GM.setValue(
-                            "mu_session_token",
-                            data.context.session_token,
-                        );
-                        await GM.setValue("mu_uid", data.context.uid);
-                        console.log(prefix + "MangaUpdates login successful");
-                    }
-                },
+            const muModal = document.createElement("div");
+            muModal.classList.add("mu-login");
+            accounts.appendChild(muModal);
+
+            const muForm = document.createElement("form");
+            muModal.appendChild(muForm);
+            muForm.insertAdjacentHTML(
+                "afterbegin",
+                `
+<div class="mu-login-title">MangaUpdates Login</div>
+<div class="mu-login-desc">
+    Note: The MangaUpdates API does not support OAuth.
+    Username and password are required to create a session token.
+</div>
+<div id="mu-login-error"></div>
+<div>
+    <label for="mu-username">Username:</label>
+    <input type="text" id="mu-username" name="username" required>
+</div>
+<div>
+    <label for="mu-password">Password:</label>
+    <input type="password" id="mu-password" name="password" required>
+</div>
+<div>
+    <button type="submit">Login</button>
+    <button type="button">Cancel</button>
+</div>`,
+            );
+
+            muForm
+                .querySelector("button:nth-child(2)")
+                .addEventListener("click", () => muModal.remove());
+
+            muForm.addEventListener("submit", (e) => {
+                e.preventDefault();
+                const formData = new FormData(muForm);
+
+                GM.xmlHttpRequest({
+                    url: MU_API + "/account/login",
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    data: JSON.stringify({
+                        username: formData.get("username"),
+                        password: formData.get("password"),
+                    }),
+                    onload: async (response) => {
+                        const data = JSON.parse(response.responseText);
+                        if (data.status === "success") {
+                            await GM.setValue(
+                                "mu_session_token",
+                                data.context.session_token,
+                            );
+                            await GM.setValue("mu_uid", data.context.uid);
+                            console.log(
+                                prefix + "MangaUpdates login successful",
+                            );
+                            muModal.remove();
+                        } else {
+                            muForm.querySelector(
+                                "#mu-login-error",
+                            ).textContent = "⚠️" + data.reason;
+                            console.error(
+                                prefix + "MangaUpdates login failed:",
+                                data.reason,
+                            );
+                        }
+                    },
+                    onerror: (e) =>
+                        console.error(prefix + "MangaUpdates login error", e),
+                });
             });
         });
         if ((await GM.getValue("mu_session_token", "")) !== "") {
