@@ -7,11 +7,11 @@ import {
     loadConfig,
     parseFileForChapterNumber,
 } from "./config.mjs";
+import mangaUpdates from "./mangaupdates.mjs";
 import myAnimeList from "./myanimelist.mjs";
 
 (async () => {
     const prefix = "[komga-sync] ";
-    const MU_API = "https://api.mangaupdates.com/v1";
 
     if (document.title === "komga-sync MAL auth") {
         return myAnimeList.handleOAuthRedirect();
@@ -117,7 +117,7 @@ import myAnimeList from "./myanimelist.mjs";
                 console.log(prefix + "Chapter complete, syncing..");
 
                 const sites = [
-                    ["MangaUpdates", updateMuListSeries],
+                    ["MangaUpdates", mangaUpdates.updateSeries],
                     ["MyAnimeList", myAnimeList.updateStatus],
                     ["AniList", aniList.updateEntry],
                 ];
@@ -170,71 +170,6 @@ import myAnimeList from "./myanimelist.mjs";
     // Check if tokens are expired based on documented expiration times
     myAnimeList.checkTokenExpiration();
     aniList.checkTokenExpiration();
-
-    async function muRequest(endpoint, method, data) {
-        const token = await GM.getValue("mu_session_token");
-        return new Promise((resolve, reject) => {
-            GM.xmlHttpRequest({
-                url: MU_API + endpoint,
-                method,
-                headers: {
-                    Authorization: "Bearer " + token,
-                    "Content-Type": "application/json",
-                },
-                data: data !== undefined ? JSON.stringify(data) : undefined,
-                onload: (response) => {
-                    if (response.status === 401) {
-                        GM.setValue("mu_session_token", "");
-                        alert(
-                            "MangaUpdates session expired, please login again.",
-                        );
-                    }
-                    return resolve(response);
-                },
-                onerror: (error) => {
-                    console.error(error);
-                    return reject(error);
-                },
-            });
-        });
-    }
-
-    async function updateMuListSeries(mangaUpdatesId, chapterNum) {
-        chapterNum = Math.floor(chapterNum);
-
-        const token = await GM.getValue("mu_session_token", "");
-        if (token === "") {
-            return false;
-        }
-
-        const update = {
-            series: {
-                id: mangaUpdatesId,
-            },
-            status: {
-                chapter: chapterNum,
-            },
-        };
-        let endpoint = "/lists/series";
-
-        let r = await muRequest("/lists/series/" + mangaUpdatesId, "GET");
-        if (r.status === 404) {
-            update.list_id = 0; // add to reading list
-        } else {
-            const current = JSON.parse(r.responseText);
-            if (current.status.chapter >= chapterNum) {
-                return true;
-            }
-            endpoint += "/update";
-        }
-
-        r = await muRequest(endpoint, "POST", [update]);
-        if (r.status === 200) {
-            return true;
-        } else {
-            return false;
-        }
-    }
 
     // Create Shadow DOM
     const host = document.createElement("div");
@@ -313,80 +248,10 @@ import myAnimeList from "./myanimelist.mjs";
         muLogin.textContent = "MangaUpdates Login";
         muLogin.className = "login-button";
         accounts.appendChild(muLogin);
-        muLogin.addEventListener("click", async () => {
-            const muModal = document.createElement("div");
-            muModal.classList.add("mu-login");
-            accounts.appendChild(muModal);
-
-            const muForm = document.createElement("form");
-            muModal.appendChild(muForm);
-            muForm.insertAdjacentHTML(
-                "afterbegin",
-                `
-<div class="mu-login-title">MangaUpdates Login</div>
-<div class="mu-login-desc">
-    Note: The MangaUpdates API does not support OAuth.
-    Username and password are required to create a session token.
-</div>
-<div id="mu-login-error"></div>
-<div>
-    <label for="mu-username">Username:</label>
-    <input type="text" id="mu-username" name="username" required>
-</div>
-<div>
-    <label for="mu-password">Password:</label>
-    <input type="password" id="mu-password" name="password" required>
-</div>
-<div>
-    <button type="submit">Login</button>
-    <button type="button">Cancel</button>
-</div>`,
-            );
-
-            muForm
-                .querySelector("button:nth-child(2)")
-                .addEventListener("click", () => muModal.remove());
-
-            muForm.addEventListener("submit", (e) => {
-                e.preventDefault();
-                const formData = new FormData(muForm);
-
-                GM.xmlHttpRequest({
-                    url: MU_API + "/account/login",
-                    method: "PUT",
-                    headers: { "Content-Type": "application/json" },
-                    data: JSON.stringify({
-                        username: formData.get("username"),
-                        password: formData.get("password"),
-                    }),
-                    onload: async (response) => {
-                        const data = JSON.parse(response.responseText);
-                        if (data.status === "success") {
-                            await GM.setValue(
-                                "mu_session_token",
-                                data.context.session_token,
-                            );
-                            await GM.setValue("mu_uid", data.context.uid);
-                            console.log(
-                                prefix + "MangaUpdates login successful",
-                            );
-                            muModal.remove();
-                        } else {
-                            muForm.querySelector(
-                                "#mu-login-error",
-                            ).textContent = "⚠️" + data.reason;
-                            console.error(
-                                prefix + "MangaUpdates login failed:",
-                                data.reason,
-                            );
-                        }
-                    },
-                    onerror: (e) =>
-                        console.error(prefix + "MangaUpdates login error", e),
-                });
-            });
+        muLogin.addEventListener("click", () => {
+            mangaUpdates.login(accounts);
         });
-        if ((await GM.getValue("mu_session_token", "")) !== "") {
+        if ((await mangaUpdates.getToken()) !== undefined) {
             accounts.appendChild(document.createTextNode(" Logged in ✅"));
         }
         accounts.appendChild(document.createElement("br"));
@@ -587,36 +452,24 @@ import myAnimeList from "./myanimelist.mjs";
                 content.appendChild(resultCache.MangaUpdates[searchTerm]);
                 return;
             }
-            GM.xmlHttpRequest({
-                url: MU_API + "/series/search",
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                data: JSON.stringify({
-                    search: searchTerm,
-                }),
-                onload: (response) => {
-                    const data = JSON.parse(response.responseText);
-                    const list = prepareAndCacheResult(
-                        "MangaUpdates",
-                        searchTerm,
-                    );
-                    for (const { record } of data.results) {
-                        const { card, button } = resultCard(
-                            record.image.url.thumb,
-                            record.url,
-                            record.title,
-                            record.type,
-                            record.year,
-                        );
-                        button.addEventListener("click", async () => {
-                            muUrlInput.value = record.url;
-                            await komgaSetLink("MangaUpdates", record.url);
-                        });
-                        list.appendChild(card);
-                    }
-                },
-                onerror: (e) => console.error(e),
-            });
+
+            const data = await mangaUpdates.search(searchTerm);
+
+            const list = prepareAndCacheResult("MangaUpdates", searchTerm);
+            for (const { record } of data.results) {
+                const { card, button } = resultCard(
+                    record.image.url.thumb,
+                    record.url,
+                    record.title,
+                    record.type,
+                    record.year,
+                );
+                button.addEventListener("click", async () => {
+                    muUrlInput.value = record.url;
+                    await komgaSetLink("MangaUpdates", record.url);
+                });
+                list.appendChild(card);
+            }
         });
 
         malButton.addEventListener("click", async () => {
