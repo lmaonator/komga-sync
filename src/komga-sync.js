@@ -1,4 +1,5 @@
 import addChapterParsePreview from "./add-chapter-parse-preview.mjs";
+import aniList from "./anilist.mjs";
 import chapterRecognition from "./chapter-recognition.mjs";
 import {
     createGlobalConfigDOM,
@@ -12,15 +13,12 @@ import {
     const MU_API = "https://api.mangaupdates.com/v1";
     const MAL_OAUTH = "https://myanimelist.net/v1/oauth2";
     const MAL_API = "https://api.myanimelist.net/v2";
-    const ANILIST_OAUTH = "https://anilist.co/api/v2/oauth";
-    const ANILIST_API = "https://graphql.anilist.co";
     const DICLAM = "ZjE4NDIxNGY4MTg4Y2RmNzEwZmM4N2MwMzMzYzhlMGM";
-    const DICLA = "MTYzNDc";
 
     if (document.title === "komga-sync MAL auth") {
         return malAuth();
     } else if (document.title === "komga-sync AniList auth") {
-        return aniListAuth();
+        return aniList.handleOAuthRedirect();
     }
 
     if (!document.title.startsWith("Komga")) return;
@@ -123,13 +121,14 @@ import {
                 const sites = [
                     ["MangaUpdates", updateMuListSeries],
                     ["MyAnimeList", updateMalListStatus],
-                    ["AniList", updateAniListEntry],
+                    ["AniList", aniList.updateEntry],
                 ];
                 for (const [site, func] of sites) {
                     const link = chapter.links.find((i) => i.label === site);
                     if (link) {
                         try {
-                            const r = await func(link.url, chapter.number);
+                            const id = urlToId(link.url);
+                            const r = await func(id, chapter.number);
                             if (r === true) {
                                 console.log(
                                     prefix + "Successfully synced with " + site,
@@ -179,17 +178,7 @@ import {
             alert("MyAnimeList session has expired, please login again.");
         }
     }
-    const alTokenExpiresAt = await GM.getValue("anilist_expires_at", null);
-    if (alTokenExpiresAt !== null) {
-        if (alTokenExpiresAt <= Date.now()) {
-            await GM.deleteValue("anilist_access_token");
-            await GM.deleteValue("anilist_expires_at");
-            alert("AniList session has expired, please login again.");
-        } else if (alTokenExpiresAt - 604800_000 <= Date.now()) {
-            // 1 week before expiration
-            alert("AniList session will expire soon, please login again.");
-        }
-    }
+    aniList.checkTokenExpiration();
 
     async function muRequest(endpoint, method, data) {
         const token = await GM.getValue("mu_session_token");
@@ -219,7 +208,7 @@ import {
         });
     }
 
-    async function updateMuListSeries(url, chapterNum) {
+    async function updateMuListSeries(mangaUpdatesId, chapterNum) {
         chapterNum = Math.floor(chapterNum);
 
         const token = await GM.getValue("mu_session_token", "");
@@ -229,7 +218,7 @@ import {
 
         const update = {
             series: {
-                id: urlToId(url),
+                id: mangaUpdatesId,
             },
             status: {
                 chapter: chapterNum,
@@ -237,7 +226,7 @@ import {
         };
         let endpoint = "/lists/series";
 
-        let r = await muRequest("/lists/series/" + urlToId(url), "GET");
+        let r = await muRequest("/lists/series/" + mangaUpdatesId, "GET");
         if (r.status === 404) {
             update.list_id = 0; // add to reading list
         } else {
@@ -334,12 +323,11 @@ import {
         });
     }
 
-    async function updateMalListStatus(url, chapterNum) {
-        const mangaId = urlToId(url);
+    async function updateMalListStatus(malId, chapterNum) {
         chapterNum = Math.floor(chapterNum);
 
         let r = await malRequest(
-            "/manga/" + mangaId + "?fields=my_list_status,num_chapters,status",
+            "/manga/" + malId + "?fields=my_list_status,num_chapters,status",
             "GET",
         );
         const data = JSON.parse(r.responseText);
@@ -376,7 +364,7 @@ import {
         }
 
         r = await malRequest(
-            "/manga/" + mangaId + "/my_list_status",
+            "/manga/" + malId + "/my_list_status",
             "PATCH",
             update,
         );
@@ -384,155 +372,6 @@ import {
             return true;
         } else {
             return false;
-        }
-    }
-
-    async function aniListRequest(query, variables) {
-        const accessToken = await GM.getValue("anilist_access_token");
-        return new Promise((resolve, reject) => {
-            GM.xmlHttpRequest({
-                url: ANILIST_API,
-                method: "POST",
-                headers: {
-                    Authorization: "Bearer " + accessToken,
-                    "Content-Type": "application/json",
-                    Accept: "application/json",
-                },
-                data: JSON.stringify({
-                    query: query,
-                    variables: variables,
-                }),
-                onload: async (r) => {
-                    if (
-                        r.status === 400 &&
-                        r.responseText.includes("Invalid token")
-                    ) {
-                        await GM.deleteValue("anilist_access_token");
-                        await GM.deleteValue("anilist_expires_at");
-                        alert(
-                            "AniList session has expired, please login again.",
-                        );
-                    }
-                    return resolve(r);
-                },
-                onerror: (e) => {
-                    console.error(e);
-                    return reject(e);
-                },
-            });
-        });
-    }
-
-    async function updateAniListEntry(url, chapterNum) {
-        const aniListId = urlToId(url);
-        chapterNum = Math.floor(chapterNum);
-
-        let r = await aniListRequest(
-            `
-            query ($id: Int) {
-                Media(id: $id, type: MANGA) {
-                    id
-                    chapters
-                    mediaListEntry {
-                        id
-                        status
-                        progress
-                        repeat
-                        startedAt {
-                            year
-                            month
-                            day
-                        }
-                        completedAt {
-                            year
-                            month
-                            day
-                        }
-                    }
-                }
-            }
-            `,
-            { id: aniListId },
-        );
-        let data = JSON.parse(r.responseText);
-        if (data.errors?.length > 0) {
-            console.error(data.errors);
-            return false;
-        }
-        const manga = data.data.Media;
-        const mle = manga.mediaListEntry;
-
-        if (mle.progress >= chapterNum) {
-            return true;
-        }
-
-        const date = new Date();
-        const currentDate = {
-            year: date.getFullYear(),
-            month: date.getMonth() + 1,
-            day: date.getDate(),
-        };
-        const vars = {
-            progress: chapterNum,
-        };
-        if (manga.chapters == chapterNum) {
-            vars.status = "COMPLETED";
-            vars.completedAt = currentDate;
-        } else {
-            vars.status = "CURRENT";
-        }
-
-        if (mle === undefined) {
-            // create new mediaListEntry
-            vars.mediaId = aniListId;
-            vars.startedAt = currentDate;
-        } else if (
-            ["CURRENT", "DROPPED", "PAUSED", "PLANNING"].includes(mle.status)
-        ) {
-            // update mediaListEntry
-            vars.id = mle.id;
-        } else {
-            // already completed, do nothing
-            return true;
-        }
-        r = await aniListRequest(
-            `
-            mutation (
-                $id: Int, $mediaId: Int,
-                $status: MediaListStatus, $progress: Int, $repeat: Int,
-                $startedAt: FuzzyDateInput, $completedAt: FuzzyDateInput
-            ) {
-                SaveMediaListEntry (
-                    id: $id, mediaId: $mediaId,
-                    status: $status, progress: $progress, repeat: $repeat,
-                    startedAt: $startedAt, completedAt: $completedAt
-                ) {
-                    id
-                    mediaId
-                    status
-                    progress
-                    repeat
-                    startedAt {
-                        year
-                        month
-                        day
-                    }
-                    completedAt {
-                        year
-                        month
-                        day
-                    }
-                }
-            }
-            `,
-            vars,
-        );
-        data = JSON.parse(r.responseText);
-        if (data.errors?.length > 0) {
-            console.error(data.errors);
-            return false;
-        } else {
-            return true;
         }
     }
 
@@ -720,14 +559,8 @@ import {
         aniListLogin.textContent = "AniList Login";
         aniListLogin.className = "login-button";
         accounts.appendChild(aniListLogin);
-        aniListLogin.addEventListener("click", () => {
-            const params = new URLSearchParams({
-                client_id: atob(DICLA),
-                response_type: "token",
-            });
-            GM.openInTab(ANILIST_OAUTH + "/authorize?" + params.toString());
-        });
-        if ((await GM.getValue("anilist_access_token", "")) !== "") {
+        aniListLogin.addEventListener("click", aniList.openOAuth);
+        if ((await aniList.getToken()) !== undefined) {
             accounts.appendChild(document.createTextNode(" Logged in ✅"));
         }
 
@@ -1004,83 +837,44 @@ import {
                 content.appendChild(resultCache.AniList[searchTerm]);
                 return;
             }
-            const data = {
-                query: `
-                    query ($search: String) {
-                        Page {
-                            media(search: $search, type: MANGA) {
-                            id
-                            idMal
-                            title {
-                                romaji
-                                english
-                                native
-                            }
-                            format
-                            startDate {
-                                year
-                            }
-                            coverImage {
-                                medium
-                            }
-                            synonyms
-                            siteUrl
-                            }
-                        }
+
+            const data = await aniList.search(searchTerm);
+
+            const list = prepareAndCacheResult(
+                "AniList",
+                searchTerm,
+                "Click on the series thumbnail or title to show synonyms.",
+            );
+            for (const m of data.data.Page.media) {
+                const { card, button } = resultCard(
+                    m.coverImage.medium,
+                    m.siteUrl,
+                    m.title.english ?? m.title.romaji ?? m.title.native,
+                    m.format,
+                    m.startDate.year,
+                    (m.title.romaji ? m.title.romaji + "<br>" : "") +
+                        m.title.native +
+                        (m.synonyms.length > 0
+                            ? "<br><b>Synonyms:</b><ul>" +
+                              m.synonyms.reduce(
+                                  (acc, cur) => acc + `<li>${cur}</li>`,
+                                  "",
+                              ) +
+                              "</ul>"
+                            : ""),
+                );
+                button.addEventListener("click", async () => {
+                    await komgaSetLink("AniList", m.siteUrl);
+                    alUrlInput.value = m.siteUrl;
+                    if (m.idMal !== null && malUrlInput.value === "") {
+                        const malUrl =
+                            "https://myanimelist.net/manga/" + m.idMal;
+                        await komgaSetLink("MyAnimeList", malUrl);
+                        malUrlInput.value = malUrl;
                     }
-                `,
-                variables: {
-                    search: searchTerm,
-                },
-            };
-            GM.xmlHttpRequest({
-                url: ANILIST_API,
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    Accept: "application/json",
-                },
-                data: JSON.stringify(data),
-                onload: (r) => {
-                    const data = JSON.parse(r.responseText);
-                    const list = prepareAndCacheResult(
-                        "AniList",
-                        searchTerm,
-                        "Click on the series thumbnail or title to show synonyms.",
-                    );
-                    for (const m of data.data.Page.media) {
-                        const { card, button } = resultCard(
-                            m.coverImage.medium,
-                            m.siteUrl,
-                            m.title.english ?? m.title.romaji ?? m.title.native,
-                            m.format,
-                            m.startDate.year,
-                            (m.title.romaji ? m.title.romaji + "<br>" : "") +
-                                m.title.native +
-                                (m.synonyms.length > 0
-                                    ? "<br><b>Synonyms:</b><ul>" +
-                                      m.synonyms.reduce(
-                                          (acc, cur) => acc + `<li>${cur}</li>`,
-                                          "",
-                                      ) +
-                                      "</ul>"
-                                    : ""),
-                        );
-                        button.addEventListener("click", async () => {
-                            await komgaSetLink("AniList", m.siteUrl);
-                            alUrlInput.value = m.siteUrl;
-                            if (m.idMal !== null && malUrlInput.value === "") {
-                                const malUrl =
-                                    "https://myanimelist.net/manga/" + m.idMal;
-                                await komgaSetLink("MyAnimeList", malUrl);
-                                malUrlInput.value = malUrl;
-                            }
-                        });
-                        list.appendChild(card);
-                    }
-                },
-                onerror: (e) => console.error(e),
-            });
+                });
+                list.appendChild(card);
+            }
         });
 
         shadow.appendChild(modal);
@@ -1115,30 +909,6 @@ import {
         }
         GM.deleteValue("mal_state");
         GM.deleteValue("mal_challenge");
-    }
-
-    async function aniListAuth() {
-        const url = new URL(window.location.href);
-        const params = new URLSearchParams(url.hash.slice(1));
-        const access_token = params.get("access_token");
-        if (access_token !== null) {
-            await GM.setValue("anilist_access_token", access_token);
-            await GM.setValue(
-                "anilist_expires_at",
-                parseInt(params.get("expires_in"), 10) * 1000 + Date.now(),
-            );
-            document.body.appendChild(
-                document.createTextNode(
-                    "Successfully authenticated with AniList ✅. You can now close this window.",
-                ),
-            );
-        } else {
-            document.body.appendChild(
-                document.createTextNode(
-                    "Failed to authenticate with AniList ⚠️. Please try again.",
-                ),
-            );
-        }
     }
 
     function urlToId(url) {
