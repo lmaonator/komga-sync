@@ -154,19 +154,21 @@ import {
         if (match !== null) {
             const seriesId = document
                 .querySelector("a.link-underline.text-h5")
-                .href.match(/series\/([^/]+)/)[1];
-            if (
-                !chapterParsePreviewInserted &&
-                parseFileForChapterNumber(config, seriesId)
-            ) {
-                chapterParsePreviewInserted = addChapterParsePreview();
-            } else {
-                chapterParsePreviewInserted = true;
+                ?.href.match(/series\/([^/]+)/)?.[1];
+            if (seriesId !== undefined) {
+                if (
+                    !chapterParsePreviewInserted &&
+                    parseFileForChapterNumber(config, seriesId)
+                ) {
+                    chapterParsePreviewInserted = addChapterParsePreview();
+                } else {
+                    chapterParsePreviewInserted = true;
+                }
             }
         } else {
             chapterParsePreviewInserted = false;
         }
-    }, 500);
+    }, 250);
 
     // Check if tokens are expired based on documented expiration times
     const malTokenExpiresAt = await GM.getValue("mal_expires_at", null);
