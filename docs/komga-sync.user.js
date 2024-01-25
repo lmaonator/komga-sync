@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name        komga-sync
-// @version     1.0.0
+// @version     1.1.0
 // @author      lmaonator
 // @description Sync manga chapter progress with tracking websites.
 // @license     GPL-3.0-or-later
@@ -384,12 +384,11 @@
                         return;
                     }
                     // Add UI button :3
-                    const button = createElement("button", {
-                        className:
-                            "v-btn v-btn--icon v-btn--round theme--dark v-size--default",
-                        style: "width: 120px;",
-                        textContent: "Komga Sync",
-                    });
+                    const button = document.createElement("button");
+                    button.className =
+                        "v-btn v-btn--icon v-btn--round theme--dark v-size--default";
+                    button.style.width = "120px";
+                    button.textContent = "Komga Sync";
                     button.addEventListener("click", () => {
                         createUI(seriesId);
                         button.blur();
@@ -483,19 +482,21 @@
             if (match !== null) {
                 const seriesId = document
                     .querySelector("a.link-underline.text-h5")
-                    .href.match(/series\/([^/]+)/)[1];
-                if (
-                    !chapterParsePreviewInserted &&
-                    parseFileForChapterNumber(config, seriesId)
-                ) {
-                    chapterParsePreviewInserted = addChapterParsePreview();
-                } else {
-                    chapterParsePreviewInserted = true;
+                    ?.href.match(/series\/([^/]+)/)?.[1];
+                if (seriesId !== undefined) {
+                    if (
+                        !chapterParsePreviewInserted &&
+                        parseFileForChapterNumber(config, seriesId)
+                    ) {
+                        chapterParsePreviewInserted = addChapterParsePreview();
+                    } else {
+                        chapterParsePreviewInserted = true;
+                    }
                 }
             } else {
                 chapterParsePreviewInserted = false;
             }
-        }, 500);
+        }, 250);
 
         // Check if tokens are expired based on documented expiration times
         const malTokenExpiresAt = await GM.getValue("mal_expires_at", null);
@@ -964,7 +965,9 @@ button:hover {
     width: 200px;
 }
 
-.links input {
+.links input,
+input[type="text"],
+input[type="password"] {
     padding: 5px;
     margin: 2px;
     box-sizing: border-box;
@@ -1060,6 +1063,45 @@ a {
     list-style: inside;
     overflow: auto;
 }
+
+.mu-login {
+    z-index: 310;
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.mu-login form {
+    width: 100%;
+    max-width: 540px;
+}
+
+.mu-login div {
+    margin: 6px;
+}
+
+.mu-login .mu-login-title {
+    font-size: 1.5em;
+    font-weight: bold;
+    margin-bottom: 12px;
+}
+
+.mu-login .mu-login-desc {
+    font-size: smaller;
+    margin-bottom: 12px;
+}
+
+#mu-login-error {
+    color: #ff0000;
+    font-weight: bold;
+    margin-bottom: 12px;
+}
 `;
         shadow.appendChild(shadowStyle);
 
@@ -1133,27 +1175,76 @@ a {
             muLogin.className = "login-button";
             accounts.appendChild(muLogin);
             muLogin.addEventListener("click", async () => {
-                const username = prompt("MangaUpdates username:");
-                const password = prompt("MangaUpdates password:");
-                GM.xmlHttpRequest({
-                    url: MU_API + "/account/login",
-                    method: "PUT",
-                    headers: { "Content-Type": "application/json" },
-                    data: JSON.stringify({
-                        username,
-                        password,
-                    }),
-                    onload: async (response) => {
-                        const data = JSON.parse(response.responseText);
-                        if (data.status === "success") {
-                            await GM.setValue(
-                                "mu_session_token",
-                                data.context.session_token,
-                            );
-                            await GM.setValue("mu_uid", data.context.uid);
-                            console.log(prefix + "MangaUpdates login successful");
-                        }
-                    },
+                const muModal = document.createElement("div");
+                muModal.classList.add("mu-login");
+                accounts.appendChild(muModal);
+
+                const muForm = document.createElement("form");
+                muModal.appendChild(muForm);
+                muForm.insertAdjacentHTML(
+                    "afterbegin",
+                    `
+<div class="mu-login-title">MangaUpdates Login</div>
+<div class="mu-login-desc">
+    Note: The MangaUpdates API does not support OAuth.
+    Username and password are required to create a session token.
+</div>
+<div id="mu-login-error"></div>
+<div>
+    <label for="mu-username">Username:</label>
+    <input type="text" id="mu-username" name="username" required>
+</div>
+<div>
+    <label for="mu-password">Password:</label>
+    <input type="password" id="mu-password" name="password" required>
+</div>
+<div>
+    <button type="submit">Login</button>
+    <button type="button">Cancel</button>
+</div>`,
+                );
+
+                muForm
+                    .querySelector("button:nth-child(2)")
+                    .addEventListener("click", () => muModal.remove());
+
+                muForm.addEventListener("submit", (e) => {
+                    e.preventDefault();
+                    const formData = new FormData(muForm);
+
+                    GM.xmlHttpRequest({
+                        url: MU_API + "/account/login",
+                        method: "PUT",
+                        headers: { "Content-Type": "application/json" },
+                        data: JSON.stringify({
+                            username: formData.get("username"),
+                            password: formData.get("password"),
+                        }),
+                        onload: async (response) => {
+                            const data = JSON.parse(response.responseText);
+                            if (data.status === "success") {
+                                await GM.setValue(
+                                    "mu_session_token",
+                                    data.context.session_token,
+                                );
+                                await GM.setValue("mu_uid", data.context.uid);
+                                console.log(
+                                    prefix + "MangaUpdates login successful",
+                                );
+                                muModal.remove();
+                            } else {
+                                muForm.querySelector(
+                                    "#mu-login-error",
+                                ).textContent = "⚠️" + data.reason;
+                                console.error(
+                                    prefix + "MangaUpdates login failed:",
+                                    data.reason,
+                                );
+                            }
+                        },
+                        onerror: (e) =>
+                            console.error(prefix + "MangaUpdates login error", e),
+                    });
                 });
             });
             if ((await GM.getValue("mu_session_token", "")) !== "") {
@@ -1274,35 +1365,30 @@ a {
             );
             const [alUrlInput, alButton] = urlForm("AniList", urls.al, links);
 
-            createElement("label", { textContent: "Search Term:" }, links);
-            const searchInput = createElement(
-                "input",
-                {
-                    value: series.metadata.title ?? series.name,
-                    type: "text",
-                    className: "search-input",
-                },
-                links,
-            );
+            let label = document.createElement("label");
+            label.textContent = "Search Term:";
+            links.appendChild(label);
 
-            const buttonContainer = createElement(
-                "div",
-                { className: "button-container" },
-                links,
-            );
+            const searchInput = document.createElement("input");
+            searchInput.value = series.metadata.title ?? series.name;
+            searchInput.type = "text";
+            searchInput.classList.add("search-input");
+            links.appendChild(searchInput);
+
+            const buttonContainer = document.createElement("div");
+            buttonContainer.classList.add = "button-container";
             buttonContainer.appendChild(muButton);
             buttonContainer.appendChild(malButton);
             buttonContainer.appendChild(alButton);
-            createElement(
-                "div",
-                {
-                    className: "button-note",
-                    textContent:
-                        " Note: AniList has MyAnimeList IDs for most entries, if " +
-                        "MAL is still missing it will also be added if available.",
-                },
-                links,
-            );
+            links.appendChild(buttonContainer);
+
+            const note = document.createElement("div");
+            note.classList.add("button-note");
+            note.textContent =
+                " Note: AniList has MyAnimeList IDs for most entries, if " +
+                "MAL is still missing it will also be added if available.";
+            links.appendChild(note);
+
             content.appendChild(links);
 
             const komgaSetLink = async (label, url) => {
@@ -1323,11 +1409,9 @@ a {
             };
 
             const prepareAndCacheResult = (name, searchTerm, note) => {
-                const resultContainer = createElement(
-                    "div",
-                    { className: "result-container" },
-                    content,
-                );
+                const resultContainer = document.createElement("div");
+                resultContainer.classList.add("result-container");
+                content.appendChild(resultContainer);
                 // cache for 5 minutes
                 resultCache[name][searchTerm] = resultContainer;
                 setTimeout(() => delete resultCache[name][searchTerm], 300_000);
@@ -1340,46 +1424,39 @@ a {
                 }
                 resultContainer.appendChild(header);
                 if (note !== undefined) {
-                    createElement(
-                        "div",
-                        {
-                            textContent: note,
-                            className: "result-note",
-                        },
-                        resultContainer,
-                    );
+                    const div = document.createElement("div");
+                    div.classList.add("result-note");
+                    div.textContent = note;
+                    resultContainer.appendChild(div);
                 }
-                const list = createElement(
-                    "div",
-                    { className: "result-list" },
-                    resultContainer,
-                );
+                const list = document.createElement("div");
+                list.classList.add("result-list");
+                resultContainer.appendChild(list);
                 return list;
             };
 
             const resultCard = (picture, url, title, type, date, extra) => {
                 type = type.replace("_", " ").toLowerCase();
-                const card = createElement("div", { className: "result-card" });
-                const thumb = createElement("div", { className: "thumb" }, card);
-                const img = createElement("img", { src: picture }, thumb);
-                const details = createElement("details", {}, card);
+                const card = document.createElement("div");
+                card.classList.add("result-card");
+                const thumb = document.createElement("div");
+                thumb.classList.add("thumb");
+                card.appendChild(thumb);
+                const img = document.createElement("img");
+                img.src = picture;
+                thumb.appendChild(img);
+                const details = document.createElement("details");
+                card.appendChild(details);
                 img.addEventListener("click", () => {
                     details.toggleAttribute("open");
                 });
-                createElement(
-                    "summary",
-                    {
-                        innerHTML: `${title} <a href="${url}" target="_blank">🔗</a>
-                        <span>${type}</span> [${date}]`,
-                    },
-                    details,
-                );
+                const summary = document.createElement("summary");
+                summary.innerHTML = `${title} <a href="${url}" target="_blank">🔗</a> <span>${type}</span> [${date}]`;
+                details.appendChild(summary);
                 details.insertAdjacentHTML("beforeend", extra ?? "");
-                const button = createElement(
-                    "button",
-                    { textContent: "Set URL" },
-                    card,
-                );
+                const button = document.createElement("button");
+                button.textContent = "Set URL";
+                card.appendChild(button);
                 return { card, button };
             };
 
@@ -1655,24 +1732,6 @@ a {
                 result += chars[Math.floor(Math.random() * chars.length)];
             }
             return result;
-        }
-
-        /**
-         * Creates a new element with optional attributes and optionally append to a parent
-         * @param {String} tagName tag name, eg. div
-         * @param {Object} attributes object with attributes, eg. { id: 'my-element' }
-         * @param {Element} appendTo parent to which the new element should be appended to
-         * @returns {Element} the created element
-         */
-        function createElement(tagName, attributes, appendTo) {
-            const el = document.createElement(tagName);
-            if (attributes !== undefined) {
-                for (const [key, value] of Object.entries(attributes)) {
-                    el[key] = value;
-                }
-            }
-            if (appendTo !== undefined) appendTo.appendChild(el);
-            return el;
         }
     })();
 
