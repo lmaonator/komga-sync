@@ -56,12 +56,11 @@ import {
                     return;
                 }
                 // Add UI button :3
-                const button = createElement("button", {
-                    className:
-                        "v-btn v-btn--icon v-btn--round theme--dark v-size--default",
-                    style: "width: 120px;",
-                    textContent: "Komga Sync",
-                });
+                const button = document.createElement("button");
+                button.className =
+                    "v-btn v-btn--icon v-btn--round theme--dark v-size--default";
+                button.style.width = "120px";
+                button.textContent = "Komga Sync";
                 button.addEventListener("click", () => {
                     createUI(seriesId);
                     button.blur();
@@ -803,35 +802,30 @@ import {
         );
         const [alUrlInput, alButton] = urlForm("AniList", urls.al, links);
 
-        createElement("label", { textContent: "Search Term:" }, links);
-        const searchInput = createElement(
-            "input",
-            {
-                value: series.metadata.title ?? series.name,
-                type: "text",
-                className: "search-input",
-            },
-            links,
-        );
+        let label = document.createElement("label");
+        label.textContent = "Search Term:";
+        links.appendChild(label);
 
-        const buttonContainer = createElement(
-            "div",
-            { className: "button-container" },
-            links,
-        );
+        const searchInput = document.createElement("input");
+        searchInput.value = series.metadata.title ?? series.name;
+        searchInput.type = "text";
+        searchInput.classList.add("search-input");
+        links.appendChild(searchInput);
+
+        const buttonContainer = document.createElement("div");
+        buttonContainer.classList.add = "button-container";
         buttonContainer.appendChild(muButton);
         buttonContainer.appendChild(malButton);
         buttonContainer.appendChild(alButton);
-        createElement(
-            "div",
-            {
-                className: "button-note",
-                textContent:
-                    " Note: AniList has MyAnimeList IDs for most entries, if " +
-                    "MAL is still missing it will also be added if available.",
-            },
-            links,
-        );
+        links.appendChild(buttonContainer);
+
+        const note = document.createElement("div");
+        note.classList.add("button-note");
+        note.textContent =
+            " Note: AniList has MyAnimeList IDs for most entries, if " +
+            "MAL is still missing it will also be added if available.";
+        links.appendChild(note);
+
         content.appendChild(links);
 
         const komgaSetLink = async (label, url) => {
@@ -852,11 +846,9 @@ import {
         };
 
         const prepareAndCacheResult = (name, searchTerm, note) => {
-            const resultContainer = createElement(
-                "div",
-                { className: "result-container" },
-                content,
-            );
+            const resultContainer = document.createElement("div");
+            resultContainer.classList.add("result-container");
+            content.appendChild(resultContainer);
             // cache for 5 minutes
             resultCache[name][searchTerm] = resultContainer;
             setTimeout(() => delete resultCache[name][searchTerm], 300_000);
@@ -869,46 +861,39 @@ import {
             }
             resultContainer.appendChild(header);
             if (note !== undefined) {
-                createElement(
-                    "div",
-                    {
-                        textContent: note,
-                        className: "result-note",
-                    },
-                    resultContainer,
-                );
+                const div = document.createElement("div");
+                div.classList.add("result-note");
+                div.textContent = note;
+                resultContainer.appendChild(div);
             }
-            const list = createElement(
-                "div",
-                { className: "result-list" },
-                resultContainer,
-            );
+            const list = document.createElement("div");
+            list.classList.add("result-list");
+            resultContainer.appendChild(list);
             return list;
         };
 
         const resultCard = (picture, url, title, type, date, extra) => {
             type = type.replace("_", " ").toLowerCase();
-            const card = createElement("div", { className: "result-card" });
-            const thumb = createElement("div", { className: "thumb" }, card);
-            const img = createElement("img", { src: picture }, thumb);
-            const details = createElement("details", {}, card);
+            const card = document.createElement("div");
+            card.classList.add("result-card");
+            const thumb = document.createElement("div");
+            thumb.classList.add("thumb");
+            card.appendChild(thumb);
+            const img = document.createElement("img");
+            img.src = picture;
+            thumb.appendChild(img);
+            const details = document.createElement("details");
+            card.appendChild(details);
             img.addEventListener("click", () => {
                 details.toggleAttribute("open");
             });
-            createElement(
-                "summary",
-                {
-                    innerHTML: `${title} <a href="${url}" target="_blank">🔗</a>
-                        <span>${type}</span> [${date}]`,
-                },
-                details,
-            );
+            const summary = document.createElement("summary");
+            summary.innerHTML = `${title} <a href="${url}" target="_blank">🔗</a> <span>${type}</span> [${date}]`;
+            details.appendChild(summary);
             details.insertAdjacentHTML("beforeend", extra ?? "");
-            const button = createElement(
-                "button",
-                { textContent: "Set URL" },
-                card,
-            );
+            const button = document.createElement("button");
+            button.textContent = "Set URL";
+            card.appendChild(button);
             return { card, button };
         };
 
@@ -1184,23 +1169,5 @@ import {
             result += chars[Math.floor(Math.random() * chars.length)];
         }
         return result;
-    }
-
-    /**
-     * Creates a new element with optional attributes and optionally append to a parent
-     * @param {String} tagName tag name, eg. div
-     * @param {Object} attributes object with attributes, eg. { id: 'my-element' }
-     * @param {Element} appendTo parent to which the new element should be appended to
-     * @returns {Element} the created element
-     */
-    function createElement(tagName, attributes, appendTo) {
-        const el = document.createElement(tagName);
-        if (attributes !== undefined) {
-            for (const [key, value] of Object.entries(attributes)) {
-                el[key] = value;
-            }
-        }
-        if (appendTo !== undefined) appendTo.appendChild(el);
-        return el;
     }
 })();
