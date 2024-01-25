@@ -209,6 +209,10 @@ a {
 .mu-login form {
     width: 100%;
     max-width: 540px;
+    background-color: #121212;
+    border: 1px solid #696969;
+    border-radius: 10px;
+    padding: 1em;
 }
 
 .mu-login div {
