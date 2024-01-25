@@ -245,10 +245,10 @@ query ($search: String) {
 
 const aniList = {
     getToken: getAniListToken,
-    updateEntry: updateAniListEntry,
+    checkTokenExpiration: checkAniListTokenExpiration,
     openOAuth: openAniListOAuth,
     handleOAuthRedirect: handleAniListOAuthRedirect,
-    checkTokenExpiration: checkAniListTokenExpiration,
+    updateEntry: updateAniListEntry,
     search: searchAniList,
 };
 

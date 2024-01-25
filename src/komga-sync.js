@@ -7,16 +7,14 @@ import {
     loadConfig,
     parseFileForChapterNumber,
 } from "./config.mjs";
+import myAnimeList from "./myanimelist.mjs";
 
 (async () => {
     const prefix = "[komga-sync] ";
     const MU_API = "https://api.mangaupdates.com/v1";
-    const MAL_OAUTH = "https://myanimelist.net/v1/oauth2";
-    const MAL_API = "https://api.myanimelist.net/v2";
-    const DICLAM = "ZjE4NDIxNGY4MTg4Y2RmNzEwZmM4N2MwMzMzYzhlMGM";
 
     if (document.title === "komga-sync MAL auth") {
-        return malAuth();
+        return myAnimeList.handleOAuthRedirect();
     } else if (document.title === "komga-sync AniList auth") {
         return aniList.handleOAuthRedirect();
     }
@@ -120,7 +118,7 @@ import {
 
                 const sites = [
                     ["MangaUpdates", updateMuListSeries],
-                    ["MyAnimeList", updateMalListStatus],
+                    ["MyAnimeList", myAnimeList.updateStatus],
                     ["AniList", aniList.updateEntry],
                 ];
                 for (const [site, func] of sites) {
@@ -170,14 +168,7 @@ import {
     }, 250);
 
     // Check if tokens are expired based on documented expiration times
-    const malTokenExpiresAt = await GM.getValue("mal_expires_at", null);
-    if (malTokenExpiresAt !== null) {
-        if (malTokenExpiresAt <= Date.now()) {
-            await GM.deleteValue("mal_access_token");
-            await GM.deleteValue("mal_expires_at");
-            alert("MyAnimeList session has expired, please login again.");
-        }
-    }
+    myAnimeList.checkTokenExpiration();
     aniList.checkTokenExpiration();
 
     async function muRequest(endpoint, method, data) {
@@ -238,136 +229,6 @@ import {
         }
 
         r = await muRequest(endpoint, "POST", [update]);
-        if (r.status === 200) {
-            return true;
-        } else {
-            return false;
-        }
-    }
-
-    async function malToken(code, code_verifier) {
-        const params = {
-            client_id: atob(DICLAM),
-            client_secret: "",
-        };
-        if (code !== undefined && code_verifier !== undefined) {
-            Object.assign(params, {
-                grant_type: "authorization_code",
-                code,
-                code_verifier,
-            });
-        } else {
-            Object.assign(params, {
-                grant_type: "refresh_token",
-                refresh_token: await GM.getValue("mal_refresh_token"),
-            });
-        }
-        const data = new URLSearchParams(params).toString();
-        return new Promise((resolve, reject) => {
-            GM.xmlHttpRequest({
-                url: MAL_OAUTH + "/token",
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/x-www-form-urlencoded",
-                },
-                data,
-                onload: (r) => {
-                    if (r.status === 200) {
-                        const data = JSON.parse(r.responseText);
-                        GM.setValue("mal_access_token", data.access_token);
-                        GM.setValue("mal_refresh_token", data.refresh_token);
-                        // MAL refresh tokens are valid for 1 month
-                        GM.setValue("mal_expires_at", Date.now() + 2592000_000);
-                        return resolve(true);
-                    }
-                    alert("MyAnimeList session expired, please login again.");
-                    console.error(r);
-                    return resolve(false);
-                },
-                onerror: (e) => {
-                    console.error(e);
-                    return reject(false);
-                },
-            });
-        });
-    }
-
-    async function malRequest(endpoint, method, params) {
-        const access_token = await GM.getValue("mal_access_token");
-        let data = params;
-        if (data !== undefined) {
-            data = new URLSearchParams(data).toString();
-        }
-        return new Promise((resolve, reject) => {
-            GM.xmlHttpRequest({
-                url: MAL_API + endpoint,
-                method,
-                headers: {
-                    Authorization: "Bearer " + access_token,
-                    "Content-Type": "application/x-www-form-urlencoded",
-                },
-                data,
-                onload: async (r) => {
-                    if (r.status === 401) {
-                        if (await malToken()) {
-                            return malRequest(endpoint, method, params);
-                        }
-                    }
-                    return resolve(r);
-                },
-                onerror: (e) => {
-                    console.error(e);
-                    return reject(e);
-                },
-            });
-        });
-    }
-
-    async function updateMalListStatus(malId, chapterNum) {
-        chapterNum = Math.floor(chapterNum);
-
-        let r = await malRequest(
-            "/manga/" + malId + "?fields=my_list_status,num_chapters,status",
-            "GET",
-        );
-        const data = JSON.parse(r.responseText);
-        const status = data.my_list_status ?? {
-            is_rereading: false,
-            num_chapters_read: 0,
-            status: "plan_to_read",
-        };
-
-        if (status.num_chapters_read >= chapterNum) {
-            return true;
-        }
-
-        const update = {
-            num_chapters_read: chapterNum,
-        };
-
-        const date = new Date().toISOString().substring(0, 10);
-
-        if (status.status === "plan_to_read") {
-            update.status = "reading";
-            if (status.start_date === undefined) {
-                update.start_date = date;
-            }
-        } else if (
-            status.status === "reading" &&
-            chapterNum >= data.num_chapters &&
-            data.status === "finished"
-        ) {
-            update.status = "completed";
-            if (status.finish_date === undefined) {
-                update.finish_date = date;
-            }
-        }
-
-        r = await malRequest(
-            "/manga/" + malId + "/my_list_status",
-            "PATCH",
-            update,
-        );
         if (r.status === 200) {
             return true;
         } else {
@@ -535,21 +396,8 @@ import {
         malLogin.textContent = "MyAnimeList Login";
         malLogin.className = "login-button";
         accounts.appendChild(malLogin);
-        malLogin.addEventListener("click", async () => {
-            const state = randStr(16);
-            const code_challenge = randStr(64);
-            await GM.setValue("mal_state", state);
-            await GM.setValue("mal_challenge", code_challenge);
-            const params = new URLSearchParams({
-                response_type: "code",
-                client_id: atob(DICLAM),
-                state,
-                code_challenge,
-                code_challenge_method: "plain",
-            });
-            GM.openInTab(MAL_OAUTH + "/authorize?" + params.toString());
-        });
-        if ((await GM.getValue("mal_access_token", "")) !== "") {
+        malLogin.addEventListener("click", myAnimeList.openOAuth);
+        if ((await myAnimeList.getToken()) !== undefined) {
             accounts.appendChild(document.createTextNode(" Logged in ✅"));
         }
         accounts.appendChild(document.createElement("br"));
@@ -778,56 +626,40 @@ import {
                 content.appendChild(resultCache.MyAnimeList[searchTerm]);
                 return;
             }
-            const url = new URL(MAL_API + "/manga");
-            url.searchParams.set("q", searchTerm);
-            url.searchParams.set(
-                "fields",
-                "start_date, media_type, alternative_titles",
+
+            const data = await myAnimeList.search(searchTerm);
+
+            const list = prepareAndCacheResult(
+                "MyAnimeList",
+                searchTerm,
+                "Click on the series thumbnail or title to show synonyms.",
             );
-            url.searchParams.set("nsfw", "true");
-            GM.xmlHttpRequest({
-                url: url.toString(),
-                method: "GET",
-                headers: {
-                    "X-MAL-CLIENT-ID": atob(DICLAM),
-                },
-                onload: (r) => {
-                    const data = JSON.parse(r.responseText);
-                    const list = prepareAndCacheResult(
-                        "MyAnimeList",
-                        searchTerm,
-                        "Click on the series thumbnail or title to show synonyms.",
-                    );
-                    for (const { node } of data.data) {
-                        const mangaUrl =
-                            "https://myanimelist.net/manga/" + node.id;
-                        const titles = node.alternative_titles;
-                        const { card, button } = resultCard(
-                            node.main_picture.medium,
-                            mangaUrl,
-                            node.title,
-                            node.media_type,
-                            node.start_date.slice(0, 4),
-                            (titles.en !== "" ? titles.en + "<br>" : "") +
-                                titles.ja +
-                                (titles.synonyms.length > 0
-                                    ? "<br><b>Synonyms:</b><ul>" +
-                                      titles.synonyms.reduce(
-                                          (acc, cur) => acc + `<li>${cur}</li>`,
-                                          "",
-                                      ) +
-                                      "</ul>"
-                                    : ""),
-                        );
-                        button.addEventListener("click", async () => {
-                            malUrlInput.value = mangaUrl;
-                            await komgaSetLink("MyAnimeList", mangaUrl);
-                        });
-                        list.appendChild(card);
-                    }
-                },
-                onerror: (e) => console.error(e),
-            });
+            for (const { node } of data.data) {
+                const mangaUrl = "https://myanimelist.net/manga/" + node.id;
+                const titles = node.alternative_titles;
+                const { card, button } = resultCard(
+                    node.main_picture.medium,
+                    mangaUrl,
+                    node.title,
+                    node.media_type,
+                    node.start_date.slice(0, 4),
+                    (titles.en !== "" ? titles.en + "<br>" : "") +
+                        titles.ja +
+                        (titles.synonyms.length > 0
+                            ? "<br><b>Synonyms:</b><ul>" +
+                              titles.synonyms.reduce(
+                                  (acc, cur) => acc + `<li>${cur}</li>`,
+                                  "",
+                              ) +
+                              "</ul>"
+                            : ""),
+                );
+                button.addEventListener("click", async () => {
+                    malUrlInput.value = mangaUrl;
+                    await komgaSetLink("MyAnimeList", mangaUrl);
+                });
+                list.appendChild(card);
+            }
         });
 
         alButton.addEventListener("click", async () => {
@@ -880,37 +712,6 @@ import {
         shadow.appendChild(modal);
     }
 
-    async function malAuth() {
-        const url = new URL(window.location.href);
-        const state = await GM.getValue("mal_state");
-        if (url.searchParams.get("state") !== state) {
-            document.body.appendChild(
-                document.createTextNode(
-                    "Error: Authorization state does not match",
-                ),
-            );
-            return;
-        }
-        const challenge = await GM.getValue("mal_challenge");
-        const code = url.searchParams.get("code");
-        const r = await malToken(code, challenge).catch(() => false);
-        if (r) {
-            document.body.appendChild(
-                document.createTextNode(
-                    "Successfully authenticated with MyAnimeList ✅. You can now close this window.",
-                ),
-            );
-        } else {
-            document.body.appendChild(
-                document.createTextNode(
-                    "Failed to authenticate with MyAnimeList ⚠️. Error details were logged to console.",
-                ),
-            );
-        }
-        GM.deleteValue("mal_state");
-        GM.deleteValue("mal_challenge");
-    }
-
     function urlToId(url) {
         let match = url.match(
             /^https:\/\/(?:www\.)?mangaupdates\.com\/series\/([^/]+)/i,
@@ -931,15 +732,5 @@ import {
             return parseInt(match[1], 10);
         }
         throw new Error("Invalid URL");
-    }
-
-    function randStr(length) {
-        const chars =
-            "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
-        let result = "";
-        for (let i = length; i > 0; --i) {
-            result += chars[Math.floor(Math.random() * chars.length)];
-        }
-        return result;
     }
 })();
