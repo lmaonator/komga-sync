@@ -436,7 +436,9 @@ import myAnimeList from "./myanimelist.mjs";
                 details.toggleAttribute("open");
             });
             const summary = document.createElement("summary");
-            summary.innerHTML = `${title} <a href="${url}" target="_blank">🔗</a> <span>${type}</span> [${date}]`;
+            summary.innerHTML =
+                `${title} <a href="${url}" target="_blank">🔗</a> <span>${type}</span>` +
+                (date ? ` [${date}]` : "");
             details.appendChild(summary);
             details.insertAdjacentHTML("beforeend", extra ?? "");
             const button = document.createElement("button");
@@ -495,7 +497,7 @@ import myAnimeList from "./myanimelist.mjs";
                     mangaUrl,
                     node.title,
                     node.media_type,
-                    node.start_date.slice(0, 4),
+                    node.start_date?.slice(0, 4),
                     (titles.en !== "" ? titles.en + "<br>" : "") +
                         titles.ja +
                         (titles.synonyms.length > 0
