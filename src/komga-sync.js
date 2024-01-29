@@ -7,6 +7,7 @@ import {
     loadConfig,
     parseFileForChapterNumber,
 } from "./config.mjs";
+import CropTool from "./crop-tool.mjs";
 import mangaUpdates from "./mangaupdates.mjs";
 import myAnimeList from "./myanimelist.mjs";
 
@@ -102,6 +103,15 @@ import myAnimeList from "./myanimelist.mjs";
                 r = await fetch("/api/v1/series/" + chapter.seriesId);
                 data = await r.json();
                 chapter.links = data.metadata.links;
+
+                // insert crop tool
+                const fileNamePrefix =
+                    chapter.seriesTitle +
+                    " - Ch. " +
+                    chapter.number +
+                    " - " +
+                    chapter.title;
+                document.body.appendChild(new CropTool(fileNamePrefix));
             }
 
             // Only sync if not incognito
@@ -144,6 +154,7 @@ import myAnimeList from "./myanimelist.mjs";
         } else if (chapter.id !== "") {
             console.log(prefix + "Chapter closed");
             chapter.id = "";
+            document.querySelector("crop-tool").remove();
         }
 
         // preview parsed chapter number if enabled

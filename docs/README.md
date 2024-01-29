@@ -2,7 +2,10 @@
 
 A userscript to sync manga chapter progress with tracking websites.
 
-## How it works
+Also features a crop tool that lets you crop and download part of the current page at
+original resolution. Press `X` or `touch and hold` while reading to open/close the tool.
+
+## How syncing works
 
 When you start a chapter the script checks the Komga series metadata for links to the respective
 series page titled `MangaUpdates`, `MyAnimeList` and `AniList`.
@@ -39,3 +42,10 @@ Then navigate to a main series page and a `Komga Sync` button should appear on t
 
 There you can login/connect your accounts and link the series to the respective entries on the tracking
 websites.
+
+To open the crop tool, press `X` or `touch and hold` while reading a chapter.
+Click or tap on the image to select the start point and again to select the end point.
+You can then drag the sides and corners to adjust the selection.
+Click the center of the selection to crop and download.
+The selected area will be cropped from the original image at full resolution.
+To cancel the selection and close the tool, press `ESC`, `X` or `touch and hold` again.

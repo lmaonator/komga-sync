@@ -1,0 +1,173 @@
+.ui {
+    z-index: 300;
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(#000000, #444444);
+    touch-action: none;
+}
+
+.legend {
+    z-index: 305;
+    position: fixed;
+    left: 10px;
+    top: 10px;
+    padding: 5px;
+    user-select: none;
+    pointer-events: none;
+    background-color: rgba(18, 18, 18, 0.6);
+    border: 1px solid rgba(105, 105, 105, 0.6);
+    border-radius: 10px;
+    color: #ffffff;
+    font-family: Roboto, sans-serif;
+    font-size: 14px;
+}
+
+.legend div {
+    margin: 5px;
+}
+
+.legend div.legend-title {
+    font-size: 18px;
+    font-weight: bold;
+    margin-bottom: 10px;
+}
+
+.page {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.page.hide-cursor {
+    cursor: none;
+}
+
+.crosshair {
+    z-index: 320;
+    position: fixed;
+    left: 0;
+    top: 0;
+    background-color: #ff0000;
+    user-select: none;
+    pointer-events: none;
+}
+
+.crosshair.hidden {
+    visibility: hidden;
+    display: none;
+}
+
+.crosshair-x {
+    width: 1px;
+    height: 100%;
+}
+
+.crosshair-y {
+    width: 100%;
+    height: 1px;
+}
+
+.selection {
+    z-index: 310;
+    position: fixed;
+    background-color: rgba(255, 0, 0, 0.5);
+    user-select: none;
+    pointer-events: none;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.save {
+    border: 0;
+    background-color: transparent;
+    pointer-events: auto;
+    cursor: pointer;
+    width: 90%;
+    height: 90%;
+}
+
+.drag {
+    position: absolute;
+    z-index: 330;
+    cursor: grab;
+    background-color: rgba(100, 100, 100, 0.7);
+    width: 30px;
+    height: 30px;
+    pointer-events: auto;
+    box-sizing: border-box;
+    border: 0 solid #000000;
+}
+
+.drag:hover {
+    background-color: rgba(200, 200, 200, 0.9);
+}
+
+.drag.top,
+.drag.bottom {
+    width: 100%;
+    margin: 0 30px;
+    border-width: 1px 0;
+}
+
+.drag.left,
+.drag.right {
+    height: 100%;
+    border-width: 0 1px;
+}
+
+.drag.top {
+    top: 0;
+    transform: translate(0, -100%);
+}
+
+.drag.right {
+    right: 0;
+    transform: translate(100%, 0);
+}
+
+.drag.bottom {
+    bottom: 0;
+    transform: translate(0, 100%);
+}
+
+.drag.left {
+    left: 0;
+    transform: translate(-100%, 0);
+}
+
+.drag.tl,
+.drag.tr,
+.drag.br,
+.drag.bl {
+    width: 30px;
+    height: 30px;
+    border-width: 1px;
+}
+
+.drag.tl {
+    top: 0;
+    left: 0;
+    transform: translate(-100%, -100%);
+}
+
+.drag.tr {
+    top: 0;
+    right: 0;
+    transform: translate(100%, -100%);
+}
+
+.drag.br {
+    bottom: 0;
+    right: 0;
+    transform: translate(100%, 100%);
+}
+
+.drag.bl {
+    bottom: 0;
+    left: 0;
+    transform: translate(-100%, 100%);
+}
